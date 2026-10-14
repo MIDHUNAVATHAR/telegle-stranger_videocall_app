@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import '../shared/styles/tokens.css';
 import { TabType, Stranger, ChatMessage, VirtualGift } from '../shared/types';

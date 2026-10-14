@@ -6,7 +6,7 @@ A modern monorepo for Donkey Play built with **Turborepo** and **pnpm workspaces
 
 - **Monorepo Manager:** [Turborepo](https://turbo.build/)
 - **Package Manager:** [pnpm](https://pnpm.io/)
-- **Frontend (`apps/web`):** React 19, Vite, TypeScript
+- **Frontend (`apps/web`):** Next.js 15 (App Router), React 19, TypeScript
 - **Backend (`apps/api`):** Node.js, Express.js, TypeScript
 
 ---
@@ -19,6 +19,8 @@ donkey-play/
 │   ├── web/
 │   │   ├── src/
 │   │   │   ├── app/
+│   │   │   │   ├── layout.tsx
+│   │   │   │   ├── page.tsx
 │   │   │   │   ├── App.tsx
 │   │   │   │   └── App.test.ts
 │   │   │   ├── features/
@@ -40,13 +42,11 @@ donkey-play/
 │   │   │   │   ├── constants/
 │   │   │   │   ├── types/
 │   │   │   │   └── styles/
-│   │   │   ├── assets/
-│   │   │   └── main.tsx
+│   │   │   └── assets/
 │   │   ├── public/
-│   │   ├── index.html
+│   │   ├── next.config.mjs
 │   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   └── vite.config.ts
+│   │   └── tsconfig.json
 │   │
 │   └── api/
 │       ├── src/

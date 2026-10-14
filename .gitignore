@@ -8,6 +8,8 @@ node_modules/
 # Build outputs
 dist/
 build/
+.next/
+out/
 
 # Environment files
 .env
@@ -25,6 +27,7 @@ pnpm-debug.log*
 coverage/
 .temp/
 .cache/
+*.tsbuildinfo
 
 # OS and Editor files
 .DS_Store
