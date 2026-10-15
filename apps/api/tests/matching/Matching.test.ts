@@ -176,5 +176,53 @@ describe('Phase 4: Online Presence and Matchmaking Module', () => {
       expect(emergencyEndRes.body.success).toBe(true);
       expect(emergencyEndRes.body.data.sessionId).toBe(sessionId);
     });
+
+    it('supports 10-second match confirmation accept, reject, and cancel endpoints', async () => {
+      // 1. Join queue with User A and User B to create a pairing
+      await request(app)
+        .post('/api/v1/matching/queue/join')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ filter: 'ANY' });
+
+      const resB = await request(app)
+        .post('/api/v1/matching/queue/join')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ filter: 'ANY' });
+
+      const sessionId = resB.body.data.sessionId;
+      expect(sessionId).toBeDefined();
+      expect(resB.body.data.partner).toBeDefined();
+      expect(resB.body.data.partner.id).toBe(userA.id);
+
+      // 2. Either user accepting accepts the match
+      const acceptRes = await request(app)
+        .post(`/api/v1/matching/sessions/${sessionId}/accept`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send();
+
+      expect(acceptRes.status).toBe(200);
+      expect(acceptRes.body.success).toBe(true);
+      expect(acceptRes.body.data.status).toBe('ACCEPTED');
+
+      // 3. Reject endpoint
+      const rejectRes = await request(app)
+        .post(`/api/v1/matching/sessions/${sessionId}/reject`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send();
+
+      expect(rejectRes.status).toBe(200);
+      expect(rejectRes.body.success).toBe(true);
+      expect(rejectRes.body.data.status).toBe('REJECTED');
+
+      // 4. Cancel endpoint
+      const cancelRes = await request(app)
+        .post(`/api/v1/matching/sessions/${sessionId}/cancel`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send();
+
+      expect(cancelRes.status).toBe(200);
+      expect(cancelRes.body.success).toBe(true);
+      expect(cancelRes.body.data.status).toBe('CANCELLED');
+    });
   });
 });

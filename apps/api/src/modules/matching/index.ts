@@ -49,7 +49,8 @@ export const createMatchingModule = (options: MatchingModuleOptions = {}): Match
     joinQueue,
     leaveQueue,
     getCallSession,
-    endCallSession
+    endCallSession,
+    matchmaking
   );
 
   const matchingRouter = createMatchingRouter(controller);

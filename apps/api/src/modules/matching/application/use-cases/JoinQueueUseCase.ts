@@ -23,11 +23,27 @@ export class JoinQueueUseCase {
     // Persistent wallet balance will be integrated in Phase 7 (Wallet module)
     const coinBalance = 100;
 
-    return this.matchmakingService.joinQueue(
+    const result = await this.matchmakingService.joinQueue(
       user.id,
       input.filter,
       user.gender,
       coinBalance
     );
+
+    if (result.status === 'PAIRED' && result.partnerId) {
+      const partnerUser = await this.userRepository.findById(result.partnerId);
+      if (partnerUser) {
+        result.partner = {
+          id: partnerUser.id,
+          displayName: partnerUser.displayName || partnerUser.username || 'Stranger',
+          username: partnerUser.username,
+          avatarUrl: partnerUser.avatarUrl,
+          age: partnerUser.age,
+          gender: partnerUser.gender,
+        };
+      }
+    }
+
+    return result;
   }
 }

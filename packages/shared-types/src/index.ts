@@ -24,7 +24,26 @@ export interface IUserPreferences {
 
 // Matchmaking & Call Types
 export type MatchFilter = 'ANY' | 'MALE' | 'FEMALE';
-export type MatchStatus = 'INITIATED' | 'CONNECTED' | 'COMPLETED' | 'SKIPPED' | 'FAILED' | 'REPORTED';
+export type MatchStatus =
+  | 'INITIATED'
+  | 'CONFIRMING'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'CONNECTED'
+  | 'COMPLETED'
+  | 'SKIPPED'
+  | 'FAILED'
+  | 'REPORTED';
+
+export interface IMatchPartnerProfile {
+  id: string;
+  displayName: string;
+  username?: string;
+  avatarUrl?: string;
+  age: number;
+  gender: UserGender | string;
+}
 
 export interface IMatchSession {
   sessionId: string;
@@ -34,10 +53,17 @@ export interface IMatchSession {
     avatarUrl?: string;
     bio?: string;
     gender: UserGender;
+    age?: number;
   };
   filterUsed: MatchFilter;
   coinCharged: number;
   startedAt: string;
+}
+
+export interface IMatchDecisionResponse {
+  sessionId: string;
+  status: 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+  message: string;
 }
 
 // Wallet & Financial Types

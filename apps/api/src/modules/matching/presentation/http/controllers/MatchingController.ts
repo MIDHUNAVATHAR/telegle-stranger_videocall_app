@@ -3,6 +3,7 @@ import { GetOnlinePresenceUseCase } from '../../../application/use-cases/GetOnli
 import { JoinQueueUseCase } from '../../../application/use-cases/JoinQueueUseCase';
 import { LeaveQueueUseCase } from '../../../application/use-cases/LeaveQueueUseCase';
 import { GetCallSessionUseCase, EndCallSessionUseCase } from '../../../application/use-cases/CallSessionUseCases';
+import { MatchmakingService } from '../../../infrastructure/services/MatchmakingService';
 
 export class MatchingController {
   constructor(
@@ -10,7 +11,8 @@ export class MatchingController {
     private readonly joinQueueUseCase: JoinQueueUseCase,
     private readonly leaveQueueUseCase: LeaveQueueUseCase,
     private readonly getCallSessionUseCase: GetCallSessionUseCase,
-    private readonly endCallSessionUseCase: EndCallSessionUseCase
+    private readonly endCallSessionUseCase: EndCallSessionUseCase,
+    private readonly matchmakingService?: MatchmakingService
   ) {}
 
   public getOnlinePresence = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -91,6 +93,54 @@ export class MatchingController {
       res.status(200).json({
         success: true,
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public acceptMatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const sessionId = Array.isArray(req.params.sessionId)
+        ? req.params.sessionId[0]
+        : req.params.sessionId;
+      const userId = req.user!.id;
+      const result = await this.matchmakingService?.acceptMatch(sessionId, userId);
+      res.status(200).json({
+        success: true,
+        data: result || { sessionId, status: 'ACCEPTED' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public rejectMatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const sessionId = Array.isArray(req.params.sessionId)
+        ? req.params.sessionId[0]
+        : req.params.sessionId;
+      const userId = req.user!.id;
+      const result = await this.matchmakingService?.rejectMatch(sessionId, userId);
+      res.status(200).json({
+        success: true,
+        data: result || { sessionId, status: 'REJECTED' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public cancelMatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const sessionId = Array.isArray(req.params.sessionId)
+        ? req.params.sessionId[0]
+        : req.params.sessionId;
+      const userId = req.user!.id;
+      const result = await this.matchmakingService?.cancelMatch(sessionId, userId);
+      res.status(200).json({
+        success: true,
+        data: result || { sessionId, status: 'CANCELLED' },
       });
     } catch (error) {
       next(error);

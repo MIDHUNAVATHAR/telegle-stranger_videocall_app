@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import '../shared/styles/tokens.css';
 import { TabType, Stranger, ChatMessage, VirtualGift } from '../shared/types';
-import { INITIAL_USER, SAMPLE_STRANGERS } from '../shared/constants';
+import { INITIAL_USER } from '../shared/constants';
 import { MatchingView } from '../features/matching/components/MatchingView';
 import { VideoCallView } from '../features/video-call/components/VideoCallView';
 import { ChatView } from '../features/chat/components/ChatView';
@@ -19,7 +19,6 @@ import {
   IconBolt,
   IconSettings,
   IconCompass,
-  IconVideo,
   IconChat,
   IconWallet,
   IconUser,
@@ -53,7 +52,7 @@ function AppContent() {
         .catch(() => {});
     }
   }, [isAuthenticated]);
-  const [activeStranger, setActiveStranger] = useState<Stranger | null>(SAMPLE_STRANGERS[0]);
+  const [activeStranger, setActiveStranger] = useState<Stranger | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -86,9 +85,8 @@ function AppContent() {
   };
 
   const handleNextStranger = () => {
-    const currentIndex = SAMPLE_STRANGERS.findIndex((s) => s.id === activeStranger?.id);
-    const nextStranger = SAMPLE_STRANGERS[(currentIndex + 1) % SAMPLE_STRANGERS.length];
-    handleMatchFound(nextStranger);
+    setActiveStranger(null);
+    setActiveTab('matching');
   };
 
   const handleSendMessage = (text: string) => {
@@ -300,7 +298,7 @@ function AppContent() {
           />
         )}
 
-        {activeTab === 'video-call' && activeStranger && (
+        {activeTab === 'video-call' && (activeStranger ? (
           <VideoCallView
             stranger={activeStranger}
             isChatOpen={isChatOpen}
@@ -309,7 +307,13 @@ function AppContent() {
             onOpenGiftModal={() => setIsGiftOpen(true)}
             onOpenReportModal={() => setIsReportOpen(true)}
           />
-        )}
+        ) : (
+          <MatchingView
+            onMatchFound={handleMatchFound}
+            userCoins={user.coins}
+            onOpenWallet={() => setActiveTab('wallet')}
+          />
+        ))}
 
         {activeTab === 'chat' && (
           <ChatView
@@ -363,7 +367,7 @@ function AppContent() {
           backgroundColor: 'var(--surface)',
           borderTop: '1px solid #1e2230',
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           padding: '6px 8px',
           zIndex: 100,
         }}
@@ -386,26 +390,6 @@ function AppContent() {
         >
           <IconCompass size={18} />
           <span>Match</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('video-call')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            minHeight: '48px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: activeTab === 'video-call' ? 'var(--surface-raised)' : 'transparent',
-            color: activeTab === 'video-call' ? 'var(--accent)' : 'var(--ink-secondary)',
-            fontWeight: activeTab === 'video-call' ? 700 : 500,
-            fontSize: '13px',
-          }}
-        >
-          <IconVideo size={18} />
-          <span>Call</span>
         </button>
 
         <button

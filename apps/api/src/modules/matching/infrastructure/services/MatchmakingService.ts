@@ -9,11 +9,21 @@ import {
 } from '../../domain/errors/MatchmakingErrors';
 import { logger } from '../../../../common/logger';
 
+export interface MatchPartnerProfile {
+  id: string;
+  displayName: string;
+  username?: string;
+  avatarUrl?: string;
+  age: number;
+  gender: string;
+}
+
 export interface JoinQueueResult {
   queue: string;
   status: 'SEARCHING' | 'PAIRED';
   sessionId?: string;
   partnerId?: string;
+  partner?: MatchPartnerProfile;
 }
 
 export class MatchmakingService {
@@ -219,6 +229,65 @@ export class MatchmakingService {
     return {
       durationSeconds,
       sessionId,
+    };
+  }
+
+  public async acceptMatch(
+    sessionId: string,
+    userId: string
+  ): Promise<{ sessionId: string; status: string }> {
+    const sessionData = await this.getCallSession(sessionId);
+    if (!sessionData) {
+      throw new CallSessionNotFoundError(sessionId);
+    }
+    await this.redis.hmset(`match:session:${sessionId}`, {
+      status: 'ACCEPTED',
+      acceptedBy: userId,
+      acceptedAt: new Date().toISOString(),
+    });
+    return {
+      sessionId,
+      status: 'ACCEPTED',
+    };
+  }
+
+  public async rejectMatch(
+    sessionId: string,
+    userId: string
+  ): Promise<{ sessionId: string; status: string }> {
+    const sessionData = await this.getCallSession(sessionId);
+    if (!sessionData) {
+      throw new CallSessionNotFoundError(sessionId);
+    }
+    await this.redis.hmset(`match:session:${sessionId}`, {
+      status: 'REJECTED',
+      rejectedBy: userId,
+      rejectedAt: new Date().toISOString(),
+    });
+    await this.redis.del(`call:timer:${sessionId}`);
+    return {
+      sessionId,
+      status: 'REJECTED',
+    };
+  }
+
+  public async cancelMatch(
+    sessionId: string,
+    userId: string
+  ): Promise<{ sessionId: string; status: string }> {
+    const sessionData = await this.getCallSession(sessionId);
+    if (!sessionData) {
+      throw new CallSessionNotFoundError(sessionId);
+    }
+    await this.redis.hmset(`match:session:${sessionId}`, {
+      status: 'CANCELLED',
+      cancelledBy: userId,
+      cancelledAt: new Date().toISOString(),
+    });
+    await this.redis.del(`call:timer:${sessionId}`);
+    return {
+      sessionId,
+      status: 'CANCELLED',
     };
   }
 }

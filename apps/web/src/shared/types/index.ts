@@ -28,6 +28,7 @@ export interface Stranger {
   avatar: string;
   distanceKm: number;
   status: string;
+  gender?: string;
 }
 
 export interface ChatMessage {

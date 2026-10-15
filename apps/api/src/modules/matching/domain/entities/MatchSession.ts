@@ -1,5 +1,13 @@
 export type MatchType = 'RANDOM_FREE' | 'GENDER_FILTER_PAID' | 'DIRECT_INBOX_CALL';
-export type MatchStatus = 'SEARCHING' | 'PAIRED' | 'CONNECTED' | 'ENDED';
+export type MatchStatus =
+  | 'SEARCHING'
+  | 'PAIRED'
+  | 'CONFIRMING'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'CONNECTED'
+  | 'ENDED';
 
 export interface MatchSessionProps {
   id: string;
@@ -81,6 +89,20 @@ export class MatchSession {
 
   public markConnected(): void {
     this.props.status = 'CONNECTED';
+  }
+
+  public markAccepted(): void {
+    this.props.status = 'ACCEPTED';
+  }
+
+  public markRejected(): void {
+    this.props.status = 'REJECTED';
+    this.props.endedAt = new Date();
+  }
+
+  public markCancelled(): void {
+    this.props.status = 'CANCELLED';
+    this.props.endedAt = new Date();
   }
 
   public markCoinDebited(): void {

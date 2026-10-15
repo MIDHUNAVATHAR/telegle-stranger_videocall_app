@@ -1,4 +1,5 @@
 import { api } from '../../../shared/api/client';
+import { IMatchPartnerProfile } from '@donkey-play/shared-types';
 
 export interface PresenceResponse {
   online_count: number;
@@ -9,6 +10,7 @@ export interface JoinQueueResponse {
   status: 'SEARCHING' | 'PAIRED';
   sessionId?: string;
   partnerId?: string;
+  partner?: IMatchPartnerProfile;
 }
 
 export interface CallSessionResponse {
@@ -31,6 +33,15 @@ export const matchingApi = {
 
   leaveQueue: () =>
     api.post<{ message: string }>('/matching/queue/leave'),
+
+  acceptMatch: (sessionId: string) =>
+    api.post<{ sessionId: string; status: string }>(`/matching/sessions/${sessionId}/accept`),
+
+  rejectMatch: (sessionId: string) =>
+    api.post<{ sessionId: string; status: string }>(`/matching/sessions/${sessionId}/reject`),
+
+  cancelMatch: (sessionId: string) =>
+    api.post<{ sessionId: string; status: string }>(`/matching/sessions/${sessionId}/cancel`),
 
   getCallSession: (sessionId: string) =>
     api.get<CallSessionResponse>(`/calls/${sessionId}`),

@@ -17,6 +17,9 @@ export const createMatchingRouter = (controller: MatchingController): Router => 
   // Authenticated matchmaking queue operations
   router.post('/queue/join', authMiddleware, validateRequest(joinQueueSchema), controller.joinQueue);
   router.post('/queue/leave', authMiddleware, controller.leaveQueue);
+  router.post('/sessions/:sessionId/accept', authMiddleware, controller.acceptMatch);
+  router.post('/sessions/:sessionId/reject', authMiddleware, controller.rejectMatch);
+  router.post('/sessions/:sessionId/cancel', authMiddleware, controller.cancelMatch);
 
   return router;
 };

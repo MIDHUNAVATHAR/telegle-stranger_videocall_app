@@ -135,10 +135,37 @@ export class SocketServer {
             socket.join(`session_${result.sessionId}`);
             nsp.to(`user_${result.partnerId}`).socketsJoin(`session_${result.sessionId}`);
 
-            nsp.to(`session_${result.sessionId}`).emit('match_found', {
+            const [userA, userB] = await Promise.all([
+              this.userRepository.findById(userId),
+              this.userRepository.findById(result.partnerId),
+            ]);
+
+            // Notify User A with User B's profile
+            socket.emit('match_found', {
               sessionId: result.sessionId,
               partnerId: result.partnerId,
-              timeout: 10,
+              partner: {
+                id: userB?.id || result.partnerId,
+                displayName: userB?.displayName || userB?.username || 'Stranger',
+                avatarUrl: userB?.avatarUrl,
+                age: userB?.age || 22,
+                gender: userB?.gender || 'OTHER',
+              },
+              timeoutSeconds: 10,
+            });
+
+            // Notify User B with User A's profile
+            nsp.to(`user_${result.partnerId}`).emit('match_found', {
+              sessionId: result.sessionId,
+              partnerId: userId,
+              partner: {
+                id: userA?.id || userId,
+                displayName: userA?.displayName || userA?.username || 'Stranger',
+                avatarUrl: userA?.avatarUrl,
+                age: userA?.age || 22,
+                gender: userA?.gender || 'OTHER',
+              },
+              timeoutSeconds: 10,
             });
           } else {
             socket.emit('queue_joined', {
@@ -168,11 +195,47 @@ export class SocketServer {
       });
 
       // Accept Match
-      socket.on('accept_match', (data: { sessionId: string }) => {
-        nsp.to(`session_${data.sessionId}`).emit('call_ready', {
-          sessionId: data.sessionId,
-          isCaller: true,
-        });
+      socket.on('accept_match', async (data: { sessionId: string }) => {
+        try {
+          await this.matchmakingService.acceptMatch(data.sessionId, userId);
+          nsp.to(`session_${data.sessionId}`).emit('match_accepted', {
+            sessionId: data.sessionId,
+            acceptedBy: userId,
+          });
+          nsp.to(`session_${data.sessionId}`).emit('call_ready', {
+            sessionId: data.sessionId,
+            isCaller: true,
+          });
+        } catch (error) {
+          logger.error(`Error accepting match ${data?.sessionId}`, { error });
+        }
+      });
+
+      // Reject Match
+      socket.on('reject_match', async (data: { sessionId: string }) => {
+        try {
+          await this.matchmakingService.rejectMatch(data.sessionId, userId);
+          nsp.to(`session_${data.sessionId}`).emit('match_rejected', {
+            sessionId: data.sessionId,
+            rejectedBy: userId,
+            reason: 'REJECTED_BY_USER',
+          });
+        } catch (error) {
+          logger.error(`Error rejecting match ${data?.sessionId}`, { error });
+        }
+      });
+
+      // Cancel Match / Timeout
+      socket.on('cancel_match', async (data: { sessionId: string }) => {
+        try {
+          await this.matchmakingService.cancelMatch(data.sessionId, userId);
+          nsp.to(`session_${data.sessionId}`).emit('match_cancelled', {
+            sessionId: data.sessionId,
+            reason: 'TIMEOUT',
+          });
+        } catch (error) {
+          logger.error(`Error cancelling match ${data?.sessionId}`, { error });
+        }
       });
 
       // Disconnect

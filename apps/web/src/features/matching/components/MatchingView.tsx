@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../shared/components/Button';
-import { IconBolt, IconShield, IconVideo } from '../../../shared/components/Icons';
+import { IconBolt, IconClock, IconShield, IconVideo, IconClose } from '../../../shared/components/Icons';
 import { SAMPLE_STRANGERS } from '../../../shared/constants';
 import { Stranger } from '../../../shared/types';
 import { matchingApi } from '../apis/matchingApi';
@@ -25,6 +25,13 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
   const [searchSeconds, setSearchSeconds] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Match Confirmation state (Opposite person profile, 10s countdown, accept/reject)
+  const [isConfirmingMatch, setIsConfirmingMatch] = useState(false);
+  const [matchedStranger, setMatchedStranger] = useState<Stranger | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number>(10);
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+
   useEffect(() => {
     // 1. Fetch real online presence count from REST API
     matchingApi
@@ -38,7 +45,7 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         // Fallback to initial benchmark
       });
 
-    // 2. Listen to real-time presence updates via Socket.IO
+    // 2. Listen to real-time presence and matchmaking events via Socket.IO
     try {
       const socket = socketService.getMatchmakingSocket();
       socket.on('presence_update', (data: { onlineCount: number }) => {
@@ -47,27 +54,148 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         }
       });
 
-      socket.on('match_found', (data: { sessionId: string; partnerId: string }) => {
+      socket.on('match_found', (data: {
+        sessionId: string;
+        partnerId: string;
+        partner?: {
+          id: string;
+          displayName: string;
+          avatarUrl?: string;
+          age: number;
+          gender: string;
+        };
+        timeoutSeconds?: number;
+      }) => {
         setIsSearching(false);
-        const randomStranger =
-          SAMPLE_STRANGERS[Math.floor(Math.random() * SAMPLE_STRANGERS.length)];
-        onMatchFound({
-          ...randomStranger,
-          id: data.partnerId || randomStranger.id,
-        });
+        setActiveSessionId(data.sessionId);
+        setDecisionNotice(null);
+
+        const partnerStranger: Stranger = {
+          id: data.partner?.id || data.partnerId,
+          name: data.partner?.displayName || 'Stranger',
+          age: data.partner?.age || 22,
+          avatar: data.partner?.avatarUrl || '/logo.png',
+          gender: data.partner?.gender || 'ANY',
+          country: 'Online',
+          countryFlag: '⚡',
+          interests: ['Video Chat'],
+          distanceKm: 0,
+          status: 'online',
+        };
+
+        setMatchedStranger(partnerStranger);
+        setCountdown(data.timeoutSeconds || 10);
+        setIsConfirmingMatch(true);
+      });
+
+      socket.on('match_accepted', () => {
+        setIsConfirmingMatch(false);
+        if (matchedStranger) {
+          onMatchFound(matchedStranger);
+        }
+      });
+
+      socket.on('match_rejected', (data: { reason?: string }) => {
+        setIsConfirmingMatch(false);
+        setMatchedStranger(null);
+        setActiveSessionId(null);
+        setDecisionNotice(
+          data?.reason === 'REJECTED_BY_USER'
+            ? 'Match was declined by partner. Click START to match again.'
+            : 'Match was rejected. Click START to match again.'
+        );
+      });
+
+      socket.on('match_cancelled', () => {
+        setIsConfirmingMatch(false);
+        setMatchedStranger(null);
+        setActiveSessionId(null);
+        setDecisionNotice('Match cancelled: 10s expired with no response. Click START to match again.');
       });
 
       return () => {
         socket.off('presence_update');
         socket.off('match_found');
+        socket.off('match_accepted');
+        socket.off('match_rejected');
+        socket.off('match_cancelled');
       };
     } catch {
       // In SSR or test environments, socket connection is skipped
     }
-  }, [onMatchFound]);
+  }, [onMatchFound, matchedStranger]);
+
+  // 10-to-0 seconds countdown timer during match confirmation
+  useEffect(() => {
+    if (!isConfirmingMatch) return;
+
+    setCountdown(10);
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleCancelMatch();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isConfirmingMatch, activeSessionId]);
+
+  const handleAcceptMatch = async () => {
+    if (!activeSessionId || !matchedStranger) return;
+
+    try {
+      const socket = socketService.getMatchmakingSocket();
+      socket.emit('accept_match', { sessionId: activeSessionId });
+      await matchingApi.acceptMatch(activeSessionId).catch(() => {});
+    } catch {
+      // Clean
+    }
+
+    setIsConfirmingMatch(false);
+    onMatchFound(matchedStranger);
+  };
+
+  const handleRejectMatch = async () => {
+    if (activeSessionId) {
+      try {
+        const socket = socketService.getMatchmakingSocket();
+        socket.emit('reject_match', { sessionId: activeSessionId });
+        await matchingApi.rejectMatch(activeSessionId).catch(() => {});
+      } catch {
+        // Clean
+      }
+    }
+
+    setIsConfirmingMatch(false);
+    setMatchedStranger(null);
+    setActiveSessionId(null);
+    setDecisionNotice('Match rejected. Click START to search for another stranger.');
+  };
+
+  const handleCancelMatch = async () => {
+    if (activeSessionId) {
+      try {
+        const socket = socketService.getMatchmakingSocket();
+        socket.emit('cancel_match', { sessionId: activeSessionId });
+        await matchingApi.cancelMatch(activeSessionId).catch(() => {});
+      } catch {
+        // Clean
+      }
+    }
+
+    setIsConfirmingMatch(false);
+    setMatchedStranger(null);
+    setActiveSessionId(null);
+    setDecisionNotice('Match cancelled: 10 seconds expired. Click START to match again.');
+  };
 
   const handleStartSearch = async () => {
     setErrorMessage(null);
+    setDecisionNotice(null);
 
     // If gender filter is selected, check coin balance
     if (genderFilter !== 'ANY' && userCoins < 1) {
@@ -92,12 +220,24 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
       if (result && result.status === 'PAIRED' && result.partnerId) {
         clearInterval(timer);
         setIsSearching(false);
-        const randomStranger =
-          SAMPLE_STRANGERS[Math.floor(Math.random() * SAMPLE_STRANGERS.length)];
-        onMatchFound({
-          ...randomStranger,
-          id: result.partnerId,
-        });
+        setActiveSessionId(result.sessionId || `sess_${Date.now()}`);
+
+        const matched: Stranger = {
+          id: result.partner?.id || result.partnerId,
+          name: result.partner?.displayName || 'Stranger',
+          age: result.partner?.age || 22,
+          avatar: result.partner?.avatarUrl || '/logo.png',
+          gender: result.partner?.gender || 'ANY',
+          country: 'Online',
+          countryFlag: '⚡',
+          interests: ['Video Chat'],
+          distanceKm: 0,
+          status: 'online',
+        };
+
+        setMatchedStranger(matched);
+        setCountdown(10);
+        setIsConfirmingMatch(true);
         return;
       }
     } catch {
@@ -110,7 +250,10 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
       setIsSearching(false);
       const randomStranger =
         SAMPLE_STRANGERS[Math.floor(Math.random() * SAMPLE_STRANGERS.length)];
-      onMatchFound(randomStranger);
+      setActiveSessionId(`sess_demo_${Date.now()}`);
+      setMatchedStranger(randomStranger);
+      setCountdown(10);
+      setIsConfirmingMatch(true);
     }, 2800);
 
     return () => {
@@ -224,6 +367,45 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         </div>
       )}
 
+      {/* Decision Notice Banner (Reject, Cancel, or Timeout) */}
+      {decisionNotice && (
+        <div
+          style={{
+            padding: '12px 16px',
+            backgroundColor: 'rgba(255, 90, 31, 0.1)',
+            border: '1px solid rgba(255, 90, 31, 0.3)',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--ink)',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: 'var(--accent)' }}>ℹ️</span>
+            <span>{decisionNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDecisionNotice(null)}
+            aria-label="Dismiss notice"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--ink-secondary)',
+              cursor: 'pointer',
+              padding: '2px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <IconClose size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Gender Preference Filter */}
       <div
         style={{
@@ -300,7 +482,210 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
           position: 'relative',
         }}
       >
-        {isSearching ? (
+        {isConfirmingMatch && matchedStranger ? (
+          /* Match Found Confirmation Screen: Opposite person avatar, name, age, 10s countdown, Accept & Reject */
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '380px',
+              backgroundColor: 'var(--surface-raised)',
+              border: '1px solid rgba(255, 90, 31, 0.3)',
+              borderRadius: '24px',
+              padding: '28px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 90, 31, 0.15)',
+              position: 'relative',
+            }}
+          >
+            {/* Top Badge: 10s Countdown */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                backgroundColor: countdown <= 3 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 90, 31, 0.15)',
+                border: countdown <= 3 ? '1px solid #ef4444' : '1px solid rgba(255, 90, 31, 0.4)',
+                color: countdown <= 3 ? '#ef4444' : 'var(--accent)',
+                fontSize: '13px',
+                fontWeight: 700,
+                marginBottom: '20px',
+              }}
+            >
+              <IconClock size={16} />
+              <span>Decision: {countdown}s remaining</span>
+            </div>
+
+            {/* Opposite Person Avatar with Glow Ring */}
+            <div
+              style={{
+                position: 'relative',
+                width: '110px',
+                height: '110px',
+                marginBottom: '16px',
+              }}
+            >
+              <img
+                src={matchedStranger.avatar || '/logo.png'}
+                alt={matchedStranger.name}
+                style={{
+                  width: '110px',
+                  height: '110px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '3px solid var(--accent)',
+                  boxShadow: '0 0 20px rgba(255, 90, 31, 0.4)',
+                  backgroundColor: 'var(--surface)',
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/logo.png';
+                }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: '4px',
+                  right: '4px',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: '#22c55e',
+                  border: '3px solid var(--surface-raised)',
+                }}
+              />
+            </div>
+
+            {/* Opposite Person Name & Age */}
+            <h2
+              style={{
+                fontSize: '22px',
+                fontWeight: 800,
+                color: 'var(--ink)',
+                margin: 0,
+                letterSpacing: '-0.02em',
+                textAlign: 'center',
+              }}
+            >
+              {matchedStranger.name}
+            </h2>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '6px',
+                marginBottom: '20px',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: 'var(--ink-secondary)',
+                }}
+              >
+                {matchedStranger.age} yrs old
+              </span>
+              <span style={{ color: 'var(--ink-muted)' }}>•</span>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  color: 'var(--ink-secondary)',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {!matchedStranger.gender || matchedStranger.gender === 'ANY' ? 'Stranger' : matchedStranger.gender.toLowerCase()}
+              </span>
+            </div>
+
+            {/* 10s Countdown Progress Bar */}
+            <div
+              style={{
+                width: '100%',
+                height: '4px',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '2px',
+                overflow: 'hidden',
+                marginBottom: '24px',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${(countdown / 10) * 100}%`,
+                  backgroundColor: countdown <= 3 ? '#ef4444' : 'var(--accent)',
+                  transition: 'width 1s linear, background-color 0.3s ease',
+                }}
+              />
+            </div>
+
+            {/* Both Sides Decision Buttons: Accept & Reject */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                width: '100%',
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleRejectMatch}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '14px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  color: '#ef4444',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  transition: 'all var(--t-quick) ease',
+                }}
+              >
+                <IconClose size={18} />
+                <span>Reject</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAcceptMatch}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '14px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(34, 197, 94, 0.4)',
+                  transition: 'all var(--t-quick) ease',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Accept ({countdown}s)</span>
+              </button>
+            </div>
+          </div>
+        ) : isSearching ? (
           /* Searching Radar State */
           <div
             style={{
