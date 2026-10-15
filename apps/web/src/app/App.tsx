@@ -182,22 +182,16 @@ function AppContent() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div
+          <img
+            src="/logo.png"
+            alt="Donkey Play Logo"
             style={{
-              width: '32px',
-              height: '32px',
+              width: '38px',
+              height: '38px',
               borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'var(--accent)',
-              color: 'var(--accent-ink)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 900,
-              fontSize: '15px',
+              objectFit: 'cover',
             }}
-          >
-            DP
-          </div>
+          />
           <div>
             <span
               style={{

@@ -39,7 +39,18 @@ export const EmailStep: React.FC<EmailStepProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ textAlign: 'center' }}>
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <img
+          src="/logo.png"
+          alt="Donkey Play Mascot"
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '16px',
+            marginBottom: '12px',
+            objectFit: 'cover',
+          }}
+        />
         <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#f5f6f8', marginBottom: '8px' }}>
           Welcome to Donkey Play
         </h2>
