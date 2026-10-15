@@ -1,17 +1,6 @@
 version: '3.8'
 
 services:
-  mongodb:
-    image: mongo:7.0
-    container_name: donkey_play_mongodb
-    restart: unless-stopped
-    ports:
-      - '27017:27017'
-    environment:
-      MONGO_INITDB_DATABASE: donkey_play
-    volumes:
-      - mongo_data:/data/db
-
   redis:
     image: redis:7-alpine
     container_name: donkey_play_redis
@@ -22,7 +11,5 @@ services:
       - redis_data:/data
 
 volumes:
-  mongo_data:
-    driver: local
   redis_data:
     driver: local

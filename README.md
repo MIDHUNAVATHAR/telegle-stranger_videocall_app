@@ -81,7 +81,7 @@ donkey-play/
 │   └── typescript-config/             # Base tsconfig presets
 ├── docs/                              # Architecture, DB, API & security docs
 ├── openapi/                           # donkey-play.openapi.yaml
-├── docker-compose.yml                 # MongoDB 7 & Redis 7 services
+├── docker-compose.yml                 # Local Redis 7 service
 ├── pnpm-workspace.yaml
 ├── turbo.json
 └── package.json
@@ -94,10 +94,11 @@ donkey-play/
 ### 4.1 Prerequisites
 - **Node.js:** `>= 20.x`
 - **pnpm:** `>= 9.x`
-- **Docker & Docker Compose:** For running local MongoDB and Redis instances.
+- **MongoDB Cloud (Atlas):** Direct connection string (`mongodb+srv://...`).
+- **Docker & Docker Compose:** For running local Redis (or an external Redis instance).
 
-### 4.2 Start Databases
-Spin up local MongoDB 7 and Redis 7 containers:
+### 4.2 Start Redis Cache
+Spin up the local Redis 7 container:
 ```bash
 docker compose up -d
 ```
@@ -115,7 +116,7 @@ cp .env.example .env
 ```
 
 Key environment configurations:
-- **Backend (`apps/api`):** Default runs on port `5000` (`PORT=5000`, `MONGODB_URI=mongodb://localhost:27017/donkey_play`, `REDIS_URL=redis://localhost:6379`).
+- **Backend (`apps/api`):** Default runs on port `5000` (`PORT=5000`, `MONGODB_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/donkey_play?retryWrites=true&w=majority`, `REDIS_HOST=localhost`, `REDIS_PORT=6379`).
 - **Frontend (`apps/web`):** Default runs on port `3000` (`NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1`, `NEXT_PUBLIC_SOCKET_URL=http://localhost:5000`).
 
 ### 4.5 Start in Development Mode
