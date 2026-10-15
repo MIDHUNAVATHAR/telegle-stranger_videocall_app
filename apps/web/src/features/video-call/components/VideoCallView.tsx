@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../../../shared/components/Button';
-import { Badge } from '../../../shared/components/Badge';
 import {
   IconMic,
   IconMicOff,
@@ -12,6 +11,7 @@ import {
   IconChat,
   IconBolt,
   IconShield,
+  IconClose,
 } from '../../../shared/components/Icons';
 import { Stranger } from '../../../shared/types';
 import { useWebRTC } from '../hooks/useWebRTC';
@@ -44,11 +44,9 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
     remoteStream,
     isMuted,
     isVideoOff,
-    isBlurred,
     lockCountdown,
     toggleMute,
     toggleVideo,
-    unblurRemote,
     endCall,
   } = useWebRTC({
     sessionId,
@@ -84,6 +82,11 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleLeaveCall = async () => {
+    await endCall(false);
+    onNextStranger();
   };
 
   const handleSkipToNext = async () => {
@@ -125,28 +128,28 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
 
   return (
     <div
-      data-ui
+      data-ui="fullscreen-video-call"
       style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#000000',
+        overflow: 'hidden',
+        zIndex: 50,
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--space-16)',
-        position: 'relative',
-        width: '100%',
       }}
     >
-      {/* Remote Video Container */}
+      {/* 1. Fullscreen Remote Stranger Video (No auto-blur shield) */}
       <div
         style={{
-          position: 'relative',
+          position: 'absolute',
+          inset: 0,
           width: '100%',
-          aspectRatio: '16/10',
-          minHeight: '320px',
-          backgroundColor: '#000000',
-          borderRadius: 'var(--radius-lg)',
+          height: '100%',
           overflow: 'hidden',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          backgroundColor: '#000000',
         }}
       >
         {remoteStream ? (
@@ -158,371 +161,329 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              filter: isBlurred ? 'blur(28px)' : 'none',
-              transition: 'filter 0.3s ease',
             }}
           />
         ) : (
           <img
-            src={stranger.avatar}
-            alt={stranger.name}
+            src={stranger.avatar || '/logo.png'}
+            alt=""
             style={{
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              filter: isBlurred ? 'blur(28px)' : 'none',
-              transition: 'filter 0.3s ease',
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/logo.png';
             }}
           />
         )}
+      </div>
 
-        {/* Auto-Blur Shield Overlay */}
-        {isBlurred && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.45)',
-              backdropFilter: 'blur(8px)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              padding: '16px',
-              textAlign: 'center',
-              zIndex: 10,
-            }}
-          >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 90, 31, 0.2)',
-                color: 'var(--accent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <IconShield size={28} />
-            </div>
-            <div>
-              <strong style={{ fontSize: '15px', color: '#ffffff', display: 'block' }}>
-                Auto-Blur Shield Active
-              </strong>
-              <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.75)' }}>
-                Protected against surprise content · Respect Others
-              </span>
-            </div>
-            <Button variant="primary" size="sm" onClick={unblurRemote}>
-              Tap to Reveal Stream
-            </Button>
-          </div>
-        )}
-
-        {/* Top Info Overlay */}
-        <div
+      {/* 2. Top-Left: Clean Call Duration Timer (No WebRTC P2P text) */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 'max(16px, env(safe-area-inset-top))',
+          left: '16px',
+          zIndex: 60,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          padding: '8px 14px',
+          borderRadius: 'var(--radius-full)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          color: '#ffffff',
+          fontSize: '13px',
+          fontWeight: 700,
+          letterSpacing: '0.02em',
+        }}
+      >
+        <span
           style={{
-            position: 'absolute',
-            top: '12px',
-            left: '12px',
-            right: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            pointerEvents: 'none',
-            zIndex: 15,
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: '#22c55e',
+            boxShadow: '0 0 8px #22c55e',
           }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: 'rgba(0, 0, 0, 0.65)',
-              padding: '6px 12px',
-              borderRadius: 'var(--radius-full)',
-              pointerEvents: 'auto',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 800,
-                backgroundColor: 'var(--surface-raised)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                color: 'var(--ink)',
-              }}
-            >
-              {stranger.countryFlag}
-            </span>
-            <span style={{ fontSize: 'var(--step-small)', fontWeight: 700, color: '#ffffff' }}>
-              {stranger.name}, {stranger.age}
-            </span>
-          </div>
+        />
+        <span>{formatDuration(callDurationSeconds)}</span>
+      </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: 'rgba(0, 0, 0, 0.65)',
-              padding: '6px 12px',
-              borderRadius: 'var(--radius-full)',
-              color: 'var(--accent)',
-              fontSize: 'var(--step-small)',
-              fontWeight: 700,
-            }}
-          >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--accent)',
-              }}
-            />
-            {formatDuration(callDurationSeconds)} · WebRTC P2P
-          </div>
-        </div>
+      {/* 3. Top-Right: Report & Block Button */}
+      <button
+        type="button"
+        onClick={onOpenReportModal}
+        aria-label="Report or block user"
+        style={{
+          position: 'absolute',
+          top: 'max(16px, env(safe-area-inset-top))',
+          right: '16px',
+          zIndex: 60,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          backgroundColor: 'rgba(239, 68, 68, 0.25)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(239, 68, 68, 0.5)',
+          padding: '8px 14px',
+          borderRadius: 'var(--radius-full)',
+          color: '#ff6b6b',
+          fontSize: '13px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          transition: 'background-color 0.2s ease',
+        }}
+      >
+        <IconShield size={16} />
+        <span>Report & Block</span>
+      </button>
 
-        {/* Local PIP Video */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '12px',
-            right: '12px',
-            width: '100px',
-            height: '135px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isVideoOff ? 'var(--surface-raised)' : '#111',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid rgba(255, 255, 255, 0.2)',
-            zIndex: 15,
-          }}
-        >
-          {isVideoOff ? (
-            <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-              Camera Off
-            </span>
-          ) : localStream ? (
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          ) : (
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80"
-              alt="You"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          )}
+      {/* 4. Local Picture-in-Picture Preview (Bottom-Right) */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '96px',
+          right: '16px',
+          width: '96px',
+          height: '136px',
+          borderRadius: '16px',
+          backgroundColor: isVideoOff ? 'var(--surface-raised)' : '#111111',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '2px solid rgba(255, 255, 255, 0.25)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.55)',
+          zIndex: 60,
+        }}
+      >
+        {isVideoOff ? (
           <span
             style={{
-              position: 'absolute',
-              bottom: '4px',
-              left: '6px',
-              fontSize: '10px',
-              fontWeight: 700,
-              backgroundColor: 'rgba(0,0,0,0.6)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              color: '#fff',
+              fontSize: '11px',
+              color: 'var(--ink-secondary)',
+              textAlign: 'center',
+              padding: '4px',
             }}
           >
-            You
+            Camera Off
           </span>
-        </div>
-
-        {/* Interests Overlay */}
-        <div
+        ) : localStream ? (
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <img
+            src="/logo.png"
+            alt="You"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        )}
+        <span
           style={{
             position: 'absolute',
-            bottom: '12px',
-            left: '12px',
-            display: 'flex',
-            gap: '6px',
-            flexWrap: 'wrap',
-            maxWidth: '60%',
-            zIndex: 15,
+            bottom: '4px',
+            left: '6px',
+            fontSize: '10px',
+            fontWeight: 700,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            color: '#ffffff',
           }}
         >
-          {stranger.interests.map((i) => (
-            <Badge key={i} variant="default">
-              #{i}
-            </Badge>
-          ))}
-        </div>
+          You
+        </span>
       </div>
 
-      {/* Primary Video Call Controls */}
+      {/* 5. Floating Bottom Controls: Left Leave Button, Center Tools, Right Next */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '8px',
-          backgroundColor: 'var(--surface)',
-          padding: 'var(--space-12)',
-          borderRadius: 'var(--radius-lg)',
+          position: 'absolute',
+          bottom: 'max(20px, env(safe-area-inset-bottom))',
+          left: '16px',
+          right: '16px',
+          zIndex: 60,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px',
+          maxWidth: '520px',
+          margin: '0 auto',
         }}
       >
+        {/* Left: Prominent Leave Button */}
         <button
-          onClick={toggleMute}
-          aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+          type="button"
+          onClick={handleLeaveCall}
+          aria-label="Leave call"
           style={{
-            minHeight: '48px',
-            display: 'flex',
-            flexDirection: 'column',
+            display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '4px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isMuted ? 'var(--danger-surface)' : 'var(--surface-raised)',
-            color: isMuted ? 'var(--danger)' : 'var(--ink)',
-            fontSize: 'var(--step-small)',
-            fontWeight: 600,
-            cursor: 'pointer',
+            gap: '8px',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: '#ef4444',
+            color: '#ffffff',
             border: 'none',
-          }}
-        >
-          {isMuted ? <IconMicOff size={18} /> : <IconMic size={18} />}
-          <span>{isMuted ? 'Unmute' : 'Mute'}</span>
-        </button>
-
-        <button
-          onClick={toggleVideo}
-          aria-label={isVideoOff ? 'Turn video on' : 'Turn video off'}
-          style={{
-            minHeight: '48px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isVideoOff ? 'var(--danger-surface)' : 'var(--surface-raised)',
-            color: isVideoOff ? 'var(--danger)' : 'var(--ink)',
-            fontSize: 'var(--step-small)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-          }}
-        >
-          {isVideoOff ? <IconVideoOff size={18} /> : <IconVideo size={18} />}
-          <span>{isVideoOff ? 'No Video' : 'Video'}</span>
-        </button>
-
-        <button
-          onClick={onOpenGiftModal}
-          aria-label="Send gift to stranger"
-          style={{
-            minHeight: '48px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--surface-raised)',
-            color: 'var(--accent)',
-            fontSize: 'var(--step-small)',
+            fontSize: '14px',
             fontWeight: 700,
             cursor: 'pointer',
-            border: 'none',
+            boxShadow: '0 4px 20px rgba(239, 68, 68, 0.5)',
+            transition: 'transform 0.15s ease, background-color 0.2s ease',
+            flexShrink: 0,
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          <IconGift size={18} />
-          <span>Gift</span>
+          <IconClose size={18} />
+          <span>Leave</span>
         </button>
 
-        <button
-          onClick={onToggleChat}
-          aria-label="Toggle text chat"
+        {/* Center: Controls Dock (Mute, Video, Gift, Chat) */}
+        <div
           style={{
-            minHeight: '48px',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isChatOpen ? 'var(--accent)' : 'var(--surface-raised)',
-            color: isChatOpen ? 'var(--accent-ink)' : 'var(--ink)',
-            fontSize: 'var(--step-small)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
+            gap: '8px',
+            backgroundColor: 'rgba(12, 14, 18, 0.8)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            padding: '6px 10px',
+            borderRadius: 'var(--radius-full)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
           }}
         >
-          <IconChat size={18} />
-          <span>Chat</span>
-        </button>
+          {/* Mute Button */}
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+              color: isMuted ? '#ef4444' : '#ffffff',
+              border: isMuted ? '1px solid rgba(239, 68, 68, 0.5)' : 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {isMuted ? <IconMicOff size={18} /> : <IconMic size={18} />}
+          </button>
 
-        {/* Next / Skip button with 5-Second Countdown Lock */}
+          {/* Video Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleVideo}
+            aria-label={isVideoOff ? 'Turn video on' : 'Turn video off'}
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isVideoOff ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+              color: isVideoOff ? '#ef4444' : '#ffffff',
+              border: isVideoOff ? '1px solid rgba(239, 68, 68, 0.5)' : 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {isVideoOff ? <IconVideoOff size={18} /> : <IconVideo size={18} />}
+          </button>
+
+          {/* Gift Button */}
+          <button
+            type="button"
+            onClick={onOpenGiftModal}
+            aria-label="Send gift"
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              color: 'var(--accent)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <IconGift size={18} />
+          </button>
+
+          {/* Chat Toggle Button */}
+          <button
+            type="button"
+            onClick={onToggleChat}
+            aria-label="Toggle chat"
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isChatOpen ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)',
+              color: isChatOpen ? '#ffffff' : '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <IconChat size={18} />
+          </button>
+        </div>
+
+        {/* Right: Next Stranger Button */}
         <button
+          type="button"
           onClick={handleSkipToNext}
           disabled={lockCountdown > 0}
-          aria-label={lockCountdown > 0 ? `Please wait ${lockCountdown} seconds` : 'Skip to next stranger'}
+          aria-label={lockCountdown > 0 ? `Wait ${lockCountdown}s` : 'Next stranger'}
           style={{
-            minHeight: '48px',
-            display: 'flex',
-            flexDirection: 'column',
+            display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '4px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: lockCountdown > 0 ? 'var(--surface-raised)' : 'var(--accent)',
-            color: lockCountdown > 0 ? 'var(--ink-secondary)' : 'var(--accent-ink)',
-            fontSize: 'var(--step-small)',
-            fontWeight: 800,
+            gap: '6px',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: lockCountdown > 0 ? 'rgba(255, 255, 255, 0.1)' : 'var(--accent)',
+            color: lockCountdown > 0 ? 'var(--ink-secondary)' : '#ffffff',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: 700,
             cursor: lockCountdown > 0 ? 'not-allowed' : 'pointer',
-            border: 'none',
-            opacity: lockCountdown > 0 ? 0.65 : 1,
+            opacity: lockCountdown > 0 ? 0.7 : 1,
+            boxShadow: lockCountdown > 0 ? 'none' : '0 4px 20px rgba(255, 90, 31, 0.5)',
             transition: 'all 0.2s ease',
+            flexShrink: 0,
           }}
         >
-          <IconBolt size={18} />
+          <IconBolt size={16} />
           <span>{lockCountdown > 0 ? `${lockCountdown}s` : 'Next'}</span>
-        </button>
-      </div>
-
-      {/* Safety / Report Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0 var(--space-8)',
-        }}
-      >
-        <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-tertiary)' }}>
-          Status: {stranger.status}
-        </span>
-        <button
-          onClick={onOpenReportModal}
-          style={{
-            fontSize: 'var(--step-small)',
-            color: 'var(--danger)',
-            fontWeight: 600,
-            padding: '6px 12px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          Report or Block
         </button>
       </div>
     </div>
   );
 };
+

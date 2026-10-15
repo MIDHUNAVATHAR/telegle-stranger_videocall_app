@@ -53,6 +53,7 @@ function AppContent() {
     }
   }, [isAuthenticated]);
   const [activeStranger, setActiveStranger] = useState<Stranger | null>(null);
+  const isLiveCallActive = activeTab === 'video-call' && !!activeStranger;
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -155,7 +156,7 @@ function AppContent() {
     <div
       style={{
         width: '100%',
-        maxWidth: '480px',
+        maxWidth: isLiveCallActive ? '100%' : '480px',
         margin: '0 auto',
         minHeight: '100vh',
         display: 'flex',
@@ -165,9 +166,10 @@ function AppContent() {
         color: 'var(--ink)',
       }}
     >
-      {/* Top Header Bar */}
-      <header
-        style={{
+      {/* Top Header Bar (Hidden during active fullscreen video call) */}
+      {!isLiveCallActive && (
+        <header
+          style={{
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -287,9 +289,17 @@ function AppContent() {
           </button>
         </div>
       </header>
+      )}
 
       {/* Main Tab Area */}
-      <main style={{ flex: 1, paddingBottom: '76px', display: 'flex', flexDirection: 'column' }}>
+      <main
+        style={{
+          flex: 1,
+          paddingBottom: isLiveCallActive ? 0 : '76px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {activeTab === 'matching' && (
           <MatchingView
             onMatchFound={handleMatchFound}
@@ -354,104 +364,106 @@ function AppContent() {
         )}
       </main>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <nav
-        aria-label="Bottom primary navigation"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '100%',
-          maxWidth: '480px',
-          backgroundColor: 'var(--surface)',
-          borderTop: '1px solid #1e2230',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          padding: '6px 8px',
-          zIndex: 100,
-        }}
-      >
-        <button
-          onClick={() => setActiveTab('matching')}
+      {/* Mobile Bottom Navigation Bar (Hidden during active video call) */}
+      {!isLiveCallActive && (
+        <nav
+          aria-label="Bottom primary navigation"
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            minHeight: '48px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: activeTab === 'matching' ? 'var(--surface-raised)' : 'transparent',
-            color: activeTab === 'matching' ? 'var(--accent)' : 'var(--ink-secondary)',
-            fontWeight: activeTab === 'matching' ? 700 : 500,
-            fontSize: '13px',
+            position: 'fixed',
+            bottom: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '100%',
+            maxWidth: '480px',
+            backgroundColor: 'var(--surface)',
+            borderTop: '1px solid #1e2230',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            padding: '6px 8px',
+            zIndex: 100,
           }}
         >
-          <IconCompass size={18} />
-          <span>Match</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('matching')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              minHeight: '48px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: activeTab === 'matching' ? 'var(--surface-raised)' : 'transparent',
+              color: activeTab === 'matching' ? 'var(--accent)' : 'var(--ink-secondary)',
+              fontWeight: activeTab === 'matching' ? 700 : 500,
+              fontSize: '13px',
+            }}
+          >
+            <IconCompass size={18} />
+            <span>Match</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('chat')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            minHeight: '48px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: activeTab === 'chat' ? 'var(--surface-raised)' : 'transparent',
-            color: activeTab === 'chat' ? 'var(--accent)' : 'var(--ink-secondary)',
-            fontWeight: activeTab === 'chat' ? 700 : 500,
-            fontSize: '13px',
-          }}
-        >
-          <IconChat size={18} />
-          <span>Messages</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              minHeight: '48px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: activeTab === 'chat' ? 'var(--surface-raised)' : 'transparent',
+              color: activeTab === 'chat' ? 'var(--accent)' : 'var(--ink-secondary)',
+              fontWeight: activeTab === 'chat' ? 700 : 500,
+              fontSize: '13px',
+            }}
+          >
+            <IconChat size={18} />
+            <span>Messages</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('wallet')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            minHeight: '48px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: activeTab === 'wallet' ? 'var(--surface-raised)' : 'transparent',
-            color: activeTab === 'wallet' ? 'var(--accent)' : 'var(--ink-secondary)',
-            fontWeight: activeTab === 'wallet' ? 700 : 500,
-            fontSize: '13px',
-          }}
-        >
-          <IconWallet size={18} />
-          <span>Wallet</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('wallet')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              minHeight: '48px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: activeTab === 'wallet' ? 'var(--surface-raised)' : 'transparent',
+              color: activeTab === 'wallet' ? 'var(--accent)' : 'var(--ink-secondary)',
+              fontWeight: activeTab === 'wallet' ? 700 : 500,
+              fontSize: '13px',
+            }}
+          >
+            <IconWallet size={18} />
+            <span>Wallet</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('profile')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            minHeight: '48px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: activeTab === 'profile' ? 'var(--surface-raised)' : 'transparent',
-            color: activeTab === 'profile' ? 'var(--accent)' : 'var(--ink-secondary)',
-            fontWeight: activeTab === 'profile' ? 700 : 500,
-            fontSize: '13px',
-          }}
-        >
-          <IconUser size={18} />
-          <span>Profile</span>
-        </button>
-      </nav>
+          <button
+            onClick={() => setActiveTab('profile')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              minHeight: '48px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: activeTab === 'profile' ? 'var(--surface-raised)' : 'transparent',
+              color: activeTab === 'profile' ? 'var(--accent)' : 'var(--ink-secondary)',
+              fontWeight: activeTab === 'profile' ? 700 : 500,
+              fontSize: '13px',
+            }}
+          >
+            <IconUser size={18} />
+            <span>Profile</span>
+          </button>
+        </nav>
+      )}
 
       {/* Global Modals */}
       <AuthModal
