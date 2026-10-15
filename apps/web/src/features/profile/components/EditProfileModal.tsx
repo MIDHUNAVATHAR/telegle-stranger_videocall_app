@@ -10,14 +10,13 @@ interface EditProfileModalProps {
   onClose: () => void;
   initialProfile: {
     displayName: string;
-    bio: string;
+    bio?: string;
     gender?: string;
     age?: number;
     avatarUrl?: string;
   };
   onProfileUpdated: (updated: {
     displayName: string;
-    bio: string;
     gender: string;
     age: number;
     avatarUrl?: string;
@@ -31,7 +30,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   onProfileUpdated,
 }) => {
   const [displayName, setDisplayName] = useState(initialProfile.displayName || '');
-  const [bio, setBio] = useState(initialProfile.bio || '');
   const [gender, setGender] = useState(initialProfile.gender || 'OTHER');
   const [age, setAge] = useState<number>(initialProfile.age || 18);
   const [avatarUrl, setAvatarUrl] = useState(initialProfile.avatarUrl || '');
@@ -88,7 +86,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     try {
       const payload: UpdateProfilePayload = {
         display_name: displayName.trim(),
-        bio: bio.trim(),
         gender,
         age: Number(age),
         avatar_url: avatarUrl || undefined,
@@ -97,7 +94,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       await profileApi.updateProfile(payload);
       onProfileUpdated({
         displayName: displayName.trim(),
-        bio: bio.trim(),
         gender,
         age: Number(age),
         avatarUrl,
@@ -252,30 +248,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
             </select>
           </div>
-        </div>
-
-        {/* Bio */}
-        <div>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-            Bio
-          </label>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={3}
-            maxLength={300}
-            placeholder="Tell others what you love to talk about..."
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              backgroundColor: 'var(--surface-raised)',
-              border: '1px solid #2a3042',
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--ink)',
-              fontSize: '14px',
-              resize: 'none',
-            }}
-          />
         </div>
 
         {/* Actions */}

@@ -4,86 +4,57 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../../../shared/components/Card';
 import { Button } from '../../../shared/components/Button';
 import { Badge } from '../../../shared/components/Badge';
-import { IconSettings, IconStar } from '../../../shared/components/Icons';
+import { IconShield } from '../../../shared/components/Icons';
 import { UserProfile as SharedUserProfile } from '../../../shared/types';
 import { EditProfileModal } from './EditProfileModal';
-import { PreferencesModal } from './PreferencesModal';
-import { profileApi, UserPreferences } from '../apis/profileApi';
+import { profileApi } from '../apis/profileApi';
 
 interface ProfileViewProps {
   user: SharedUserProfile;
-  onUpdateBio: (newBio: string) => void;
-  onOpenSettings: () => void;
+  onUpdateBio?: (newBio: string) => void;
+  onOpenSettings?: () => void;
 }
 
-export const ProfileView: React.FC<ProfileViewProps> = ({
-  user,
-  onUpdateBio,
-  onOpenSettings,
-}) => {
-  const [isEditingBio, setIsEditingBio] = useState(false);
-  const [bioText, setBioText] = useState(user.bio);
+export const ProfileView: React.FC<ProfileViewProps> = ({ user }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
-  const [preferences, setPreferences] = useState<UserPreferences>({
-    preferredGender: 'ANY',
-    allowIncomingCalls: true,
-    soundEnabled: true,
-  });
 
   const [localProfile, setLocalProfile] = useState({
     name: user.name,
-    bio: user.bio,
     avatar: user.avatar,
     age: 22,
     gender: 'MALE',
   });
 
   useEffect(() => {
-    // Attempt to fetch profile & preferences from API
-    profileApi.getMyProfile()
+    // Attempt to fetch profile from API
+    profileApi
+      .getMyProfile()
       .then((data) => {
         if (data && data.user) {
           setLocalProfile({
             name: data.user.display_name || data.user.username || user.name,
-            bio: data.user.bio || user.bio,
             avatar: data.user.avatar_url || user.avatar,
             age: data.user.age || 22,
             gender: data.user.gender || 'MALE',
           });
-          setBioText(data.user.bio || user.bio);
-        }
-        if (data && data.preferences) {
-          setPreferences(data.preferences);
         }
       })
       .catch(() => {
         // Guest user or offline, fall back to props
       });
-  }, [user.name, user.bio, user.avatar]);
-
-  const handleSaveBio = async () => {
-    onUpdateBio(bioText);
-    setIsEditingBio(false);
-    try {
-      await profileApi.updateProfile({ bio: bioText });
-      setLocalProfile((prev) => ({ ...prev, bio: bioText }));
-    } catch {
-      // Local fallback already applied
-    }
-  };
+  }, [user.name, user.avatar]);
 
   return (
     <div data-ui style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)' }}>
-      {/* Profile Header Card */}
+      {/* Profile Main Card */}
       <Card
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           textAlign: 'center',
-          gap: 'var(--space-12)',
-          padding: 'var(--space-24)',
+          gap: 'var(--space-16)',
+          padding: 'var(--space-32) var(--space-24)',
           backgroundColor: 'var(--surface-raised)',
         }}
       >
@@ -92,8 +63,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             src={localProfile.avatar}
             alt={localProfile.name}
             style={{
-              width: '88px',
-              height: '88px',
+              width: '96px',
+              height: '96px',
               borderRadius: '50%',
               objectFit: 'cover',
               border: '3px solid var(--accent)',
@@ -104,8 +75,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               position: 'absolute',
               bottom: '4px',
               right: '4px',
-              width: '14px',
-              height: '14px',
+              width: '16px',
+              height: '16px',
               borderRadius: '50%',
               backgroundColor: 'var(--success)',
               border: '2px solid var(--surface-raised)',
@@ -114,188 +85,63 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         <div>
-          <h1 style={{ fontSize: 'var(--step-lead)', fontWeight: 800 }}>
+          <h1 style={{ fontSize: 'var(--step-title)', fontWeight: 800, letterSpacing: '-0.02em' }}>
             {localProfile.name}, {localProfile.age}
           </h1>
-          <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-            {user.tag} · {user.country}
+          <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)', marginTop: '4px', display: 'block' }}>
+            {user.tag}
           </span>
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px' }}>
-          <Badge variant="accent">18+ Verified Human</Badge>
           <Badge variant="success">Karma 100%</Badge>
           <Badge variant="default">Strictly No Nudity</Badge>
-        </div>
-
-        {/* Bio Section */}
-        <div style={{ width: '100%', marginTop: 'var(--space-8)' }}>
-          {isEditingBio ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <textarea
-                value={bioText}
-                onChange={(e) => setBioText(e.target.value)}
-                maxLength={300}
-                style={{
-                  width: '100%',
-                  minHeight: '70px',
-                  backgroundColor: 'var(--surface)',
-                  color: 'var(--ink)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '10px',
-                  border: '1px solid #2a3042',
-                  fontSize: 'var(--step-body)',
-                }}
-              />
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <Button variant="ghost" size="sm" onClick={() => setIsEditingBio(false)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" size="sm" onClick={handleSaveBio}>
-                  Save
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div
-              onClick={() => setIsEditingBio(true)}
-              style={{
-                cursor: 'pointer',
-                padding: '10px 14px',
-                backgroundColor: 'var(--surface)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: 'var(--step-body)',
-                color: 'var(--ink)',
-              }}
-            >
-              {localProfile.bio || 'No bio yet. Tap to add your bio!'}
-              <span
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: 'var(--accent)',
-                  marginTop: '4px',
-                }}
-              >
-                Tap to edit bio
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Edit Profile Button */}
         <Button
           variant="secondary"
-          size="sm"
+          size="md"
           fullWidth
           onClick={() => setIsEditModalOpen(true)}
+          style={{ marginTop: 'var(--space-8)' }}
         >
           Edit Profile & Photo
         </Button>
       </Card>
 
-      {/* Stats Board */}
+      {/* Safety Notice */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: 'var(--space-16)',
+          backgroundColor: 'var(--surface)',
+          borderRadius: 'var(--radius-md)',
+          borderLeft: '4px solid var(--accent)',
         }}
       >
-        <Card style={{ textAlign: 'center', padding: 'var(--space-16)' }}>
-          <strong
-            style={{
-              fontSize: 'var(--step-lead)',
-              color: 'var(--accent)',
-              display: 'block',
-            }}
-          >
-            142
+        <span style={{ color: 'var(--accent)', flexShrink: 0 }}>
+          <IconShield size={24} />
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <strong style={{ fontSize: 'var(--step-small)', color: 'var(--ink)' }}>
+            Respect Others · Strictly No Nudity
           </strong>
-          <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-            Chats Met
+          <span style={{ fontSize: '13px', color: 'var(--ink-secondary)' }}>
+            Zero tolerance for harassment, recording peers, or explicit content.
           </span>
-        </Card>
-        <Card style={{ textAlign: 'center', padding: 'var(--space-16)' }}>
-          <strong
-            style={{
-              fontSize: 'var(--step-lead)',
-              color: 'var(--ink)',
-              display: 'block',
-            }}
-          >
-            48
-          </strong>
-          <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-            Gifts Sent
-          </span>
-        </Card>
-        <Card style={{ textAlign: 'center', padding: 'var(--space-16)' }}>
-          <strong
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              fontSize: 'var(--step-lead)',
-              color: 'var(--success)',
-            }}
-          >
-            <IconStar size={18} /> 5.0
-          </strong>
-          <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-            Community Score
-          </span>
-        </Card>
+        </div>
       </div>
 
-      {/* Matching Preferences Quick Card */}
-      <Card
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          cursor: 'pointer',
-        }}
-        onClick={() => setIsPreferencesModalOpen(true)}
-      >
-        <div>
-          <strong style={{ fontSize: 'var(--step-body)', display: 'block' }}>
-            Match Gender Filter
-          </strong>
-          <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-            Current: {preferences.preferredGender === 'ANY' ? 'Anyone (Free)' : preferences.preferredGender}
-          </span>
-        </div>
-        <Button variant="ghost" size="sm">
-          Change
-        </Button>
-      </Card>
-
-      {/* Interests */}
-      <Card style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <h2 style={{ fontSize: 'var(--step-body)', fontWeight: 700 }}>My Interests</h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {user.interests.map((interest) => (
-            <Badge key={interest} variant="default">
-              #{interest}
-            </Badge>
-          ))}
-        </div>
-      </Card>
-
-      {/* Settings Action Button */}
-      <Button variant="secondary" size="md" fullWidth onClick={onOpenSettings}>
-        <IconSettings size={18} /> App & Safety Settings
-      </Button>
-
-      {/* Modals */}
+      {/* Edit Profile Modal */}
       <EditProfileModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         initialProfile={{
           displayName: localProfile.name,
-          bio: localProfile.bio,
+          bio: '',
           gender: localProfile.gender,
           age: localProfile.age,
           avatarUrl: localProfile.avatar,
@@ -303,21 +149,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         onProfileUpdated={(updated) => {
           setLocalProfile({
             name: updated.displayName,
-            bio: updated.bio,
             gender: updated.gender,
             age: updated.age,
             avatar: updated.avatarUrl || localProfile.avatar,
           });
-          setBioText(updated.bio);
-          onUpdateBio(updated.bio);
         }}
-      />
-
-      <PreferencesModal
-        isOpen={isPreferencesModalOpen}
-        onClose={() => setIsPreferencesModalOpen(false)}
-        initialPreferences={preferences}
-        onPreferencesUpdated={(updated) => setPreferences(updated)}
       />
     </div>
   );
