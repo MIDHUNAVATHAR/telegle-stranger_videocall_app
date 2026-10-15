@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
 import { AppError } from '../errors/AppError';
 import { logger } from '../logger';
 
@@ -8,6 +9,28 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
+  if (
+    err instanceof ZodError ||
+    (err && typeof err === 'object' && ('issues' in err || (err as { name?: string }).name === 'ZodError'))
+  ) {
+    const issues = ((err as { issues?: Array<{ path: (string | number)[]; message: string }> }).issues || []).map(
+      (issue) => ({
+        path: Array.isArray(issue.path) ? issue.path.join('.') : String(issue.path || ''),
+        message: issue.message,
+      })
+    );
+    res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        name: 'ValidationError',
+        message: 'Invalid request payload',
+        details: issues,
+      },
+    });
+    return;
+  }
+
   if (err instanceof AppError) {
     if (err.statusCode >= 500) {
       logger.error(`Operational Server Error: ${err.message}`, err, {

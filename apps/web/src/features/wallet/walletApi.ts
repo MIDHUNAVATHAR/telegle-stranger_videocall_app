@@ -5,6 +5,8 @@ import {
   IVerifyPaymentRequest,
   IWalletBalance,
   IWalletTransaction,
+  IWithdrawRequest,
+  IWithdrawResponse,
 } from '@donkey-play/shared-types';
 
 export const walletApi = {
@@ -29,4 +31,10 @@ export const walletApi = {
       page: number;
       limit: number;
     }>(`/wallet/transactions?page=${page}&limit=${limit}`),
+
+  updateUpiId: (upiId: string) =>
+    api.put<{ upiId: string }>('/wallet/upi', { upiId }),
+
+  withdraw: (params?: IWithdrawRequest) =>
+    api.post<IWithdrawResponse>('/wallet/withdraw', params || {}),
 };

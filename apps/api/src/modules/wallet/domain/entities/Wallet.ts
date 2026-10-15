@@ -7,6 +7,7 @@ export interface IWalletEntity {
   withdrawableEarningsPaise: number;
   totalCoinsSpent: number;
   totalEarningsWithdrawnPaise: number;
+  payoutUpiId?: string;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -18,7 +19,9 @@ export type WalletTransactionType =
   | 'DIRECT_CALL_DEBIT'
   | 'GIFT_SENT_DEBIT'
   | 'GIFT_RECEIVED_CREDIT'
-  | 'REFUND_CREDIT';
+  | 'REFUND_CREDIT'
+  | 'WITHDRAWAL_PAYOUT'
+  | 'WITHDRAWAL_REFUND';
 
 export interface IWalletTransactionEntity {
   id: string;
@@ -28,7 +31,7 @@ export interface IWalletTransactionEntity {
   coinsAmount: number;
   currencyAmountPaise: number;
   idempotencyKey: string;
-  referenceType: 'RAZORPAY_ORDER' | 'MATCH' | 'CONVERSATION' | 'GIFT' | 'SYSTEM';
+  referenceType: 'RAZORPAY_ORDER' | 'RAZORPAY_PAYOUT' | 'MATCH' | 'CONVERSATION' | 'GIFT' | 'SYSTEM';
   referenceId: string;
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
   balanceAfter: {

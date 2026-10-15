@@ -48,6 +48,22 @@ export const verifyPaymentSchema = z.object({
   razorpaySignature: z.string().trim().min(1, 'Razorpay signature is required'),
 });
 
+export const upiIdSchema = z
+  .string()
+  .trim()
+  .min(3, 'UPI ID must be at least 3 characters')
+  .max(50, 'UPI ID must not exceed 50 characters')
+  .regex(/^[\w.\-_]{2,256}@[a-zA-Z]{2,64}$/, 'Invalid UPI ID format (e.g. name@upi, user@okhdfcbank)');
+
+export const updateUpiIdSchema = z.object({
+  upiId: upiIdSchema,
+});
+
+export const withdrawRequestSchema = z.object({
+  amountInr: z.number().min(1, 'Minimum withdrawal amount is ₹1').max(100000, 'Maximum withdrawal per request is ₹1,00,000').optional(),
+  amountPaise: z.number().int().min(100, 'Minimum withdrawal is ₹1 (100 paise)').optional(),
+});
+
 // Gift Schemas
 export const sendGiftSchema = z.object({
   giftSlug: z.string().trim().min(1, 'Gift slug is required'),

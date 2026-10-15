@@ -1,8 +1,12 @@
 import { getRedisClient } from '../../../../config/redis';
 import { COIN_PACKAGES, IWalletEntity, IWalletTransactionEntity, WalletTransactionType } from '../../domain/entities/Wallet';
 import {
+  InsufficientEarningsError,
   InvalidCoinPackageError,
+  MissingPayoutUpiIdError,
   PaymentVerificationError,
+  PayoutProcessingError,
+  WalletError,
 } from '../../domain/errors/WalletErrors';
 import { IWalletRepository } from '../../domain/repositories/WalletRepository';
 import { RazorpayOrderResult, RazorpayService } from '../../infrastructure/payment/RazorpayService';
@@ -17,12 +21,16 @@ export class WalletUseCases {
     purchasedCoinsBalance: number;
     withdrawableEarningsPaise: number;
     withdrawableEarningsInr: number;
+    payoutUpiId?: string;
+    totalEarningsWithdrawnPaise: number;
   }> {
     const wallet = await this.walletRepository.createOrGet(userId);
     return {
       purchasedCoinsBalance: wallet.purchasedCoinsBalance,
       withdrawableEarningsPaise: wallet.withdrawableEarningsPaise,
       withdrawableEarningsInr: Number((wallet.withdrawableEarningsPaise / 100).toFixed(2)),
+      payoutUpiId: wallet.payoutUpiId,
+      totalEarningsWithdrawnPaise: wallet.totalEarningsWithdrawnPaise,
     };
   }
 
@@ -160,6 +168,98 @@ export class WalletUseCases {
       total,
       page,
       limit,
+    };
+  }
+
+  async updatePayoutUpiId(userId: string, upiId: string): Promise<{ upiId: string }> {
+    const cleanUpi = upiId.trim().toLowerCase();
+    const upiRegex = /^[\w.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+    if (!upiRegex.test(cleanUpi)) {
+      throw new WalletError('Invalid UPI ID format. Example: user@upi or mobile@paytm', 400, 'INVALID_UPI_ID');
+    }
+    const updated = await this.walletRepository.updatePayoutUpiId(userId, cleanUpi);
+    return { upiId: updated.payoutUpiId || cleanUpi };
+  }
+
+  async withdrawEarnings(
+    userId: string,
+    params: { amountInr?: number; amountPaise?: number; narration?: string }
+  ): Promise<{
+    payoutId: string;
+    amountInr: number;
+    amountPaise: number;
+    upiId: string;
+    status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    remainingEarningsPaise: number;
+    remainingEarningsInr: number;
+    transaction: IWalletTransactionEntity;
+  }> {
+    const wallet = await this.walletRepository.createOrGet(userId);
+    const upiId = wallet.payoutUpiId;
+    if (!upiId) {
+      throw new MissingPayoutUpiIdError();
+    }
+
+    // Determine withdrawal amount in paise
+    let requestedPaise: number;
+    if (params.amountPaise !== undefined && params.amountPaise > 0) {
+      requestedPaise = Math.floor(params.amountPaise);
+    } else if (params.amountInr !== undefined && params.amountInr > 0) {
+      requestedPaise = Math.round(params.amountInr * 100);
+    } else {
+      // If neither is specified, withdraw full available balance
+      requestedPaise = wallet.withdrawableEarningsPaise;
+    }
+
+    if (requestedPaise <= 0) {
+      throw new WalletError('Withdrawal amount must be greater than ₹0', 400, 'INVALID_WITHDRAWAL_AMOUNT');
+    }
+
+    if (requestedPaise > wallet.withdrawableEarningsPaise) {
+      throw new InsufficientEarningsError(requestedPaise, wallet.withdrawableEarningsPaise);
+    }
+
+    // Idempotency reference for Razorpay payout
+    const referenceId = `pout_${userId.substring(0, 8)}_${Date.now()}`;
+    const idempotencyKey = `payout_${referenceId}`;
+
+    // Execute Razorpay Payout
+    let payoutResult;
+    try {
+      payoutResult = await this.razorpayService.createPayout({
+        amountPaise: requestedPaise,
+        upiId,
+        referenceId,
+        narration: params.narration || 'Donkey Play Creator Payout',
+      });
+    } catch (err: unknown) {
+      const error = err as Error;
+      throw new PayoutProcessingError(error.message);
+    }
+
+    // Atomically debit earnings and record transaction in ledger
+    const { wallet: updatedWallet, transaction } = await this.walletRepository.withdrawEarnings(
+      userId,
+      requestedPaise,
+      idempotencyKey,
+      payoutResult.payoutId,
+      {
+        upiId,
+        utr: payoutResult.utr,
+        razorpayPayoutId: payoutResult.payoutId,
+        payoutStatus: payoutResult.status,
+      }
+    );
+
+    return {
+      payoutId: payoutResult.payoutId,
+      amountInr: Number((requestedPaise / 100).toFixed(2)),
+      amountPaise: requestedPaise,
+      upiId,
+      status: payoutResult.status,
+      remainingEarningsPaise: updatedWallet.withdrawableEarningsPaise,
+      remainingEarningsInr: Number((updatedWallet.withdrawableEarningsPaise / 100).toFixed(2)),
+      transaction,
     };
   }
 }

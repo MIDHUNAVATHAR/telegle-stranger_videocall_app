@@ -80,7 +80,7 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data).toEqual({
+      expect(res.body.data).toMatchObject({
         purchasedCoinsBalance: 0,
         withdrawableEarningsPaise: 0,
         withdrawableEarningsInr: 0,
@@ -189,14 +189,121 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
     });
   });
 
-  describe('Strict Invariant: Zero Withdrawals', () => {
-    it('should ensure no withdrawal endpoints exist (404)', async () => {
+  describe('PUT /api/v1/wallet/upi (Payout UPI Management)', () => {
+    it('should reject invalid UPI ID format with 400', async () => {
+      const res = await request(app)
+        .put('/api/v1/wallet/upi')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ upiId: 'invalid-upi-no-symbol' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should update payout UPI ID successfully and reflect in balance', async () => {
+      const res = await request(app)
+        .put('/api/v1/wallet/upi')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ upiId: 'alex.gamer@okaxis' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.upiId).toBe('alex.gamer@okaxis');
+
+      const balRes = await request(app)
+        .get('/api/v1/wallet/balance')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(balRes.body.data.payoutUpiId).toBe('alex.gamer@okaxis');
+    });
+  });
+
+  describe('POST /api/v1/wallet/withdraw (Instant Razorpay UPI Payouts)', () => {
+    it('should reject withdrawal when no UPI ID is configured', async () => {
+      // User with no UPI ID
+      const freshUser = User.create({
+        email: 'fresh@example.com',
+        username: 'fresh_creator',
+        age: 21,
+        gender: 'FEMALE',
+      });
+      await userRepo.save(freshUser);
+      const freshToken = tokenService.generateTokens(freshUser).accessToken;
+
+      const res = await request(app)
+        .post('/api/v1/wallet/withdraw')
+        .set('Authorization', `Bearer ${freshToken}`)
+        .send({ amountInr: 100 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('MISSING_PAYOUT_UPI');
+    });
+
+    it('should reject withdrawal when earnings balance is insufficient', async () => {
+      // Set UPI ID first
+      await request(app)
+        .put('/api/v1/wallet/upi')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ upiId: 'alex@okhdfcbank' });
+
       const res = await request(app)
         .post('/api/v1/wallet/withdraw')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ amountPaise: 50000, upiId: 'test@okaxis' });
+        .send({ amountInr: 50 });
 
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('INSUFFICIENT_EARNINGS');
+    });
+
+    it('should disburse withdrawal via Razorpay, deduct balance, and log transaction', async () => {
+      // 1. Link UPI ID
+      await request(app)
+        .put('/api/v1/wallet/upi')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ upiId: 'alex@okhdfcbank' });
+
+      // 2. Credit test earnings (e.g. 7000 paise = ₹70 from received gifts)
+      await walletRepository.creditEarningsPaise(
+        testUser.id,
+        7000,
+        `credit_gift_${Date.now()}`,
+        'GIFT',
+        'gift_test_123'
+      );
+
+      // Verify balance before
+      const balBefore = await request(app)
+        .get('/api/v1/wallet/balance')
+        .set('Authorization', `Bearer ${authToken}`);
+      expect(balBefore.body.data.withdrawableEarningsPaise).toBe(7000);
+      expect(balBefore.body.data.withdrawableEarningsInr).toBe(70);
+
+      // 3. Request withdrawal of ₹50
+      const res = await request(app)
+        .post('/api/v1/wallet/withdraw')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ amountInr: 50 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('payoutId');
+      expect(res.body.data.amountInr).toBe(50);
+      expect(res.body.data.amountPaise).toBe(5000);
+      expect(res.body.data.upiId).toBe('alex@okhdfcbank');
+      expect(res.body.data.status).toBe('COMPLETED');
+      expect(res.body.data.remainingEarningsPaise).toBe(2000);
+      expect(res.body.data.remainingEarningsInr).toBe(20);
+
+      // 4. Verify transaction was recorded
+      const txRes = await request(app)
+        .get('/api/v1/wallet/transactions')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      const withdrawalTx = txRes.body.data.find(
+        (tx: { type: string }) => tx.type === 'WITHDRAWAL_PAYOUT'
+      );
+      expect(withdrawalTx).toBeDefined();
+      expect(withdrawalTx.currencyAmountPaise).toBe(-5000);
     });
   });
 });

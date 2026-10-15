@@ -38,3 +38,28 @@ export class PaymentVerificationError extends WalletError {
     this.name = 'PaymentVerificationError';
   }
 }
+
+export class InsufficientEarningsError extends WalletError {
+  constructor(requiredPaise: number, availablePaise: number) {
+    super(
+      `Insufficient withdrawable earnings. Requested: ₹${(requiredPaise / 100).toFixed(2)}, Available: ₹${(availablePaise / 100).toFixed(2)}`,
+      400,
+      'INSUFFICIENT_EARNINGS'
+    );
+    this.name = 'InsufficientEarningsError';
+  }
+}
+
+export class MissingPayoutUpiIdError extends WalletError {
+  constructor() {
+    super('No UPI ID configured for payout. Please save a valid UPI ID first.', 400, 'MISSING_PAYOUT_UPI');
+    this.name = 'MissingPayoutUpiIdError';
+  }
+}
+
+export class PayoutProcessingError extends WalletError {
+  constructor(reason: string) {
+    super(`Payout processing failed: ${reason}`, 502, 'PAYOUT_PROCESSING_FAILED');
+    this.name = 'PayoutProcessingError';
+  }
+}

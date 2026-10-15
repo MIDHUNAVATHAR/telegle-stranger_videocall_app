@@ -13,6 +13,8 @@ export const createWalletRouter = (controller: WalletController): Router => {
   router.post('/orders', authMiddleware, controller.createOrder);
   router.post('/orders/verify', authMiddleware, controller.verifyPayment);
   router.get('/transactions', authMiddleware, controller.listTransactions);
+  router.put('/upi', authMiddleware, controller.updatePayoutUpi);
+  router.post('/withdraw', authMiddleware, controller.withdrawEarnings);
 
   return router;
 };

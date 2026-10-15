@@ -7,17 +7,13 @@ describe('Frontend Wallet & Razorpay Module', () => {
     expect(WalletView).toBeDefined();
   });
 
-  it('exposes wallet REST API client methods', () => {
+  it('exposes wallet REST API client methods including UPI and withdrawals', () => {
     expect(typeof walletApi.getBalance).toBe('function');
     expect(typeof walletApi.getPackages).toBe('function');
     expect(typeof walletApi.createOrder).toBe('function');
     expect(typeof walletApi.verifyPayment).toBe('function');
     expect(typeof walletApi.getTransactions).toBe('function');
-  });
-
-  it('strictly adheres to zero withdrawals invariant (no withdrawal client method)', () => {
-    const untypedWalletApi = walletApi as unknown as Record<string, unknown>;
-    expect(untypedWalletApi.requestWithdrawal).toBeUndefined();
-    expect(untypedWalletApi.submitUpiPayout).toBeUndefined();
+    expect(typeof walletApi.updateUpiId).toBe('function');
+    expect(typeof walletApi.withdraw).toBe('function');
   });
 });

@@ -34,4 +34,12 @@ export interface IWalletRepository {
     limit: number
   ): Promise<{ transactions: IWalletTransactionEntity[]; total: number }>;
   findTransactionByIdempotencyKey(key: string): Promise<IWalletTransactionEntity | null>;
+  updatePayoutUpiId(userId: string, upiId: string): Promise<IWalletEntity>;
+  withdrawEarnings(
+    userId: string,
+    amountPaise: number,
+    idempotencyKey: string,
+    payoutId: string,
+    metadata?: Record<string, unknown>
+  ): Promise<{ wallet: IWalletEntity; transaction: IWalletTransactionEntity }>;
 }

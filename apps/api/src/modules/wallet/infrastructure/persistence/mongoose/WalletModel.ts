@@ -6,6 +6,7 @@ export interface IWalletDocument extends Document {
   withdrawable_earnings_paise: number;
   total_coins_spent: number;
   total_earnings_withdrawn_paise: number;
+  payout_upi_id?: string | null;
   version: number;
   created_at: Date;
   updated_at: Date;
@@ -37,6 +38,7 @@ const WalletSchema = new Schema<IWalletDocument>(
     withdrawable_earnings_paise: { type: Number, required: true, default: 0, min: 0 },
     total_coins_spent: { type: Number, required: true, default: 0, min: 0 },
     total_earnings_withdrawn_paise: { type: Number, required: true, default: 0, min: 0 },
+    payout_upi_id: { type: String, default: null },
     version: { type: Number, required: true, default: 1 },
   },
   {
@@ -58,6 +60,8 @@ const WalletTransactionSchema = new Schema<IWalletTransactionDocument>(
         'GIFT_SENT_DEBIT',
         'GIFT_RECEIVED_CREDIT',
         'REFUND_CREDIT',
+        'WITHDRAWAL_PAYOUT',
+        'WITHDRAWAL_REFUND',
       ],
     },
     coins_amount: { type: Number, required: true, default: 0 },

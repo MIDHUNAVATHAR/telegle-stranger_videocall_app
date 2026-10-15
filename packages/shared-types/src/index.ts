@@ -45,6 +45,8 @@ export interface IWalletBalance {
   purchasedCoinsBalance: number;
   withdrawableEarningsPaise: number;
   withdrawableEarningsInr: number;
+  payoutUpiId?: string;
+  totalEarningsWithdrawnPaise?: number;
 }
 
 export interface ICoinPackage {
@@ -84,6 +86,26 @@ export interface IVerifyPaymentRequest {
   razorpayOrderId: string;
   razorpayPaymentId: string;
   razorpaySignature: string;
+}
+
+export interface IUpdateUpiIdRequest {
+  upiId: string;
+}
+
+export interface IWithdrawRequest {
+  amountInr?: number;
+  amountPaise?: number;
+}
+
+export interface IWithdrawResponse {
+  payoutId: string;
+  amountInr: number;
+  amountPaise: number;
+  upiId: string;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  remainingEarningsPaise: number;
+  remainingEarningsInr: number;
+  transaction: IWalletTransaction;
 }
 
 // Virtual Gifts Types

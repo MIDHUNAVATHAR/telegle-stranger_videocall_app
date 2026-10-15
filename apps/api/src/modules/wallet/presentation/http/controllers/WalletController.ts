@@ -1,4 +1,10 @@
-import { createOrderSchema, paginationQuerySchema, verifyPaymentSchema } from '@donkey-play/validation';
+import {
+  createOrderSchema,
+  paginationQuerySchema,
+  updateUpiIdSchema,
+  verifyPaymentSchema,
+  withdrawRequestSchema,
+} from '@donkey-play/validation';
 import { NextFunction, Request, Response } from 'express';
 import { WalletUseCases } from '../../../application/use-cases/WalletUseCases';
 
@@ -75,6 +81,34 @@ export class WalletController {
           limit: result.limit,
           total: result.total,
         },
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updatePayoutUpi = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id || '';
+      const { upiId } = updateUpiIdSchema.parse(req.body);
+      const result = await this.walletUseCases.updatePayoutUpiId(userId, upiId);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  withdrawEarnings = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id || '';
+      const validated = withdrawRequestSchema.parse(req.body);
+      const result = await this.walletUseCases.withdrawEarnings(userId, validated);
+      res.status(200).json({
+        success: true,
+        data: result,
       });
     } catch (err) {
       next(err);

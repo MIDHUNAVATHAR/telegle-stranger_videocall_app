@@ -1,6 +1,6 @@
 import mongoose, { Types } from 'mongoose';
 import { IWalletEntity, IWalletTransactionEntity, WalletTransactionType } from '../../../domain/entities/Wallet';
-import { InsufficientCoinsError } from '../../../domain/errors/WalletErrors';
+import { InsufficientCoinsError, InsufficientEarningsError } from '../../../domain/errors/WalletErrors';
 import { IWalletRepository } from '../../../domain/repositories/WalletRepository';
 import { IWalletDocument, IWalletTransactionDocument, WalletModel, WalletTransactionModel } from '../mongoose/WalletModel';
 
@@ -22,6 +22,7 @@ export class MongooseWalletRepository implements IWalletRepository {
       withdrawableEarningsPaise: doc.withdrawable_earnings_paise,
       totalCoinsSpent: doc.total_coins_spent,
       totalEarningsWithdrawnPaise: doc.total_earnings_withdrawn_paise,
+      payoutUpiId: doc.payout_upi_id || undefined,
       version: doc.version,
       createdAt: doc.created_at,
       updatedAt: doc.updated_at,
@@ -88,6 +89,7 @@ export class MongooseWalletRepository implements IWalletRepository {
         withdrawableEarningsPaise: 0,
         totalCoinsSpent: 0,
         totalEarningsWithdrawnPaise: 0,
+        payoutUpiId: undefined,
         version: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -395,5 +397,118 @@ export class MongooseWalletRepository implements IWalletRepository {
       }
     }
     return null;
+  }
+
+  async updatePayoutUpiId(userId: string, upiId: string): Promise<IWalletEntity> {
+    if (mongoose.connection.readyState === 1) {
+      const userObjectId = new Types.ObjectId(userId);
+      const updatedWallet = await WalletModel.findOneAndUpdate(
+        { user_id: userObjectId },
+        {
+          $set: { payout_upi_id: upiId },
+          $inc: { version: 1 },
+        },
+        { new: true, upsert: true }
+      );
+      return this.mapWallet(updatedWallet);
+    }
+
+    const wallet = await this.createOrGet(userId);
+    wallet.payoutUpiId = upiId;
+    wallet.version += 1;
+    wallet.updatedAt = new Date();
+    return wallet;
+  }
+
+  async withdrawEarnings(
+    userId: string,
+    amountPaise: number,
+    idempotencyKey: string,
+    payoutId: string,
+    metadata?: Record<string, unknown>
+  ): Promise<{ wallet: IWalletEntity; transaction: IWalletTransactionEntity }> {
+    const existingTx = await this.findTransactionByIdempotencyKey(idempotencyKey);
+    if (existingTx) {
+      const wallet = await this.createOrGet(userId);
+      return { wallet, transaction: existingTx };
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      const userObjectId = new Types.ObjectId(userId);
+      const updatedWallet = await WalletModel.findOneAndUpdate(
+        {
+          user_id: userObjectId,
+          withdrawable_earnings_paise: { $gte: amountPaise },
+        },
+        {
+          $inc: {
+            withdrawable_earnings_paise: -amountPaise,
+            total_earnings_withdrawn_paise: amountPaise,
+            version: 1,
+          },
+        },
+        { new: true }
+      );
+
+      if (!updatedWallet) {
+        const current = await this.createOrGet(userId);
+        throw new InsufficientEarningsError(amountPaise, current.withdrawableEarningsPaise);
+      }
+
+      const txDoc = await WalletTransactionModel.create({
+        wallet_id: updatedWallet._id,
+        user_id: userObjectId,
+        type: 'WITHDRAWAL_PAYOUT',
+        coins_amount: 0,
+        currency_amount_paise: -amountPaise,
+        idempotency_key: idempotencyKey,
+        reference_type: 'RAZORPAY_PAYOUT',
+        reference_id: payoutId,
+        status: 'COMPLETED',
+        balance_after: {
+          purchased_coins: updatedWallet.purchased_coins_balance,
+          withdrawable_paise: updatedWallet.withdrawable_earnings_paise,
+        },
+        metadata: metadata || {},
+      });
+
+      return {
+        wallet: this.mapWallet(updatedWallet),
+        transaction: this.mapTransaction(txDoc),
+      };
+    }
+
+    // In-memory implementation
+    const wallet = await this.createOrGet(userId);
+    if (wallet.withdrawableEarningsPaise < amountPaise) {
+      throw new InsufficientEarningsError(amountPaise, wallet.withdrawableEarningsPaise);
+    }
+
+    wallet.withdrawableEarningsPaise -= amountPaise;
+    wallet.totalEarningsWithdrawnPaise += amountPaise;
+    wallet.version += 1;
+    wallet.updatedAt = new Date();
+
+    const tx: IWalletTransactionEntity = {
+      id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      walletId: wallet.id,
+      userId,
+      type: 'WITHDRAWAL_PAYOUT',
+      coinsAmount: 0,
+      currencyAmountPaise: -amountPaise,
+      idempotencyKey,
+      referenceType: 'RAZORPAY_PAYOUT',
+      referenceId: payoutId,
+      status: 'COMPLETED',
+      balanceAfter: {
+        purchasedCoins: wallet.purchasedCoinsBalance,
+        withdrawablePaise: wallet.withdrawableEarningsPaise,
+      },
+      metadata,
+      createdAt: new Date(),
+    };
+
+    this.inMemoryTransactions.set(tx.id, tx);
+    return { wallet, transaction: tx };
   }
 }
