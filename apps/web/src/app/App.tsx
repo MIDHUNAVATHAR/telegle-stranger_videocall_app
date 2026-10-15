@@ -316,6 +316,8 @@ function AppContent() {
             onNextStranger={handleNextStranger}
             onOpenGiftModal={() => setIsGiftOpen(true)}
             onOpenReportModal={() => setIsReportOpen(true)}
+            messages={messages}
+            onSendMessage={handleSendMessage}
           />
         ) : (
           <MatchingView

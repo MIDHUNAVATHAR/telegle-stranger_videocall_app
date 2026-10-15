@@ -8,12 +8,11 @@ import {
   IconVideo,
   IconVideoOff,
   IconGift,
-  IconChat,
   IconBolt,
   IconShield,
   IconClose,
 } from '../../../shared/components/Icons';
-import { Stranger } from '../../../shared/types';
+import { Stranger, ChatMessage } from '../../../shared/types';
 import { useWebRTC } from '../hooks/useWebRTC';
 
 interface VideoCallViewProps {
@@ -23,8 +22,10 @@ interface VideoCallViewProps {
   onNextStranger: () => void;
   onOpenGiftModal: () => void;
   onOpenReportModal: () => void;
-  onToggleChat: () => void;
-  isChatOpen: boolean;
+  onToggleChat?: () => void;
+  isChatOpen?: boolean;
+  messages?: ChatMessage[];
+  onSendMessage?: (text: string) => void;
 }
 
 export const VideoCallView: React.FC<VideoCallViewProps> = ({
@@ -34,10 +35,14 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
   onNextStranger,
   onOpenGiftModal,
   onOpenReportModal,
-  onToggleChat,
-  isChatOpen,
+  messages,
+  onSendMessage,
 }) => {
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
+  const [inputText, setInputText] = useState('');
+  const [localMessages, setLocalMessages] = useState<
+    { id: string; sender: string; text: string; isSelf: boolean }[]
+  >([]);
 
   const {
     localStream,
@@ -94,6 +99,41 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
     await endCall(false);
     onNextStranger();
   };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = inputText.trim();
+    if (!text) return;
+
+    if (onSendMessage) {
+      onSendMessage(text);
+    } else {
+      setLocalMessages((prev) => [
+        ...prev.slice(-3),
+        { id: `msg_${Date.now()}`, sender: 'You', text, isSelf: true },
+      ]);
+      if (stranger) {
+        setTimeout(() => {
+          setLocalMessages((prev) => [
+            ...prev.slice(-3),
+            { id: `msg_rep_${Date.now()}`, sender: stranger.name, text: '👋 Hey!', isSelf: false },
+          ]);
+        }, 1200);
+      }
+    }
+
+    setInputText('');
+  };
+
+  const recentMessages =
+    messages && messages.length > 0
+      ? messages.slice(-3).map((m) => ({
+          id: m.id,
+          sender: m.isSelf ? 'You' : stranger?.name || 'Stranger',
+          text: m.text,
+          isSelf: m.isSelf,
+        }))
+      : localMessages.slice(-3);
 
   if (!stranger) {
     return (
@@ -243,11 +283,11 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
         <span>Report & Block</span>
       </button>
 
-      {/* 4. Local Picture-in-Picture Preview (Bottom-Right) */}
+      {/* 4. Local Picture-in-Picture Preview (Positioned above controls and input box) */}
       <div
         style={{
           position: 'absolute',
-          bottom: '96px',
+          bottom: '150px',
           right: '16px',
           width: '96px',
           height: '136px',
@@ -306,182 +346,269 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
         </span>
       </div>
 
-      {/* 5. Floating Bottom Controls: Left Leave Button, Center Tools, Right Next */}
+      {/* 5. Floating Bottom Controls: Message Input Box on top of Audio/Video/Gift Options */}
       <div
         style={{
           position: 'absolute',
-          bottom: 'max(20px, env(safe-area-inset-bottom))',
+          bottom: 'max(16px, env(safe-area-inset-bottom))',
           left: '16px',
           right: '16px',
           zIndex: 60,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
           gap: '10px',
           maxWidth: '520px',
           margin: '0 auto',
         }}
       >
-        {/* Left: Prominent Leave Button */}
-        <button
-          type="button"
-          onClick={handleLeaveCall}
-          aria-label="Leave call"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '12px 18px',
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: '#ef4444',
-            color: '#ffffff',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 4px 20px rgba(239, 68, 68, 0.5)',
-            transition: 'transform 0.15s ease, background-color 0.2s ease',
-            flexShrink: 0,
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = 'scale(0.95)';
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          <IconClose size={18} />
-          <span>Leave</span>
-        </button>
+        {/* Floating Recent In-call Messages Overlay */}
+        {recentMessages.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              maxWidth: '85%',
+              pointerEvents: 'none',
+            }}
+          >
+            {recentMessages.map((msg) => (
+              <div
+                key={msg.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'baseline',
+                  gap: '6px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  padding: '5px 12px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  fontSize: '12px',
+                  color: '#ffffff',
+                  width: 'fit-content',
+                }}
+              >
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: msg.isSelf ? 'var(--accent)' : '#60a5fa',
+                  }}
+                >
+                  {msg.sender}:
+                </span>
+                <span style={{ fontWeight: 400 }}>{msg.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
-        {/* Center: Controls Dock (Mute, Video, Gift, Chat) */}
-        <div
+        {/* Input Message Box situated directly on top of audio/video/gift options with Send button */}
+        <form
+          onSubmit={handleFormSubmit}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            backgroundColor: 'rgba(12, 14, 18, 0.8)',
+            backgroundColor: 'rgba(12, 14, 18, 0.85)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
-            padding: '6px 10px',
+            padding: '6px 8px 6px 14px',
             borderRadius: 'var(--radius-full)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
           }}
         >
-          {/* Mute Button */}
-          <button
-            type="button"
-            onClick={toggleMute}
-            aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Type a message..."
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)',
-              color: isMuted ? '#ef4444' : '#ffffff',
-              border: isMuted ? '1px solid rgba(239, 68, 68, 0.5)' : 'none',
-              cursor: 'pointer',
-            }}
-          >
-            {isMuted ? <IconMicOff size={18} /> : <IconMic size={18} />}
-          </button>
-
-          {/* Video Toggle Button */}
-          <button
-            type="button"
-            onClick={toggleVideo}
-            aria-label={isVideoOff ? 'Turn video on' : 'Turn video off'}
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: isVideoOff ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)',
-              color: isVideoOff ? '#ef4444' : '#ffffff',
-              border: isVideoOff ? '1px solid rgba(239, 68, 68, 0.5)' : 'none',
-              cursor: 'pointer',
-            }}
-          >
-            {isVideoOff ? <IconVideoOff size={18} /> : <IconVideo size={18} />}
-          </button>
-
-          {/* Gift Button */}
-          <button
-            type="button"
-            onClick={onOpenGiftModal}
-            aria-label="Send gift"
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              color: 'var(--accent)',
+              flex: 1,
+              backgroundColor: 'transparent',
               border: 'none',
-              cursor: 'pointer',
+              outline: 'none',
+              color: '#ffffff',
+              fontSize: '13px',
+              fontWeight: 500,
             }}
-          >
-            <IconGift size={18} />
-          </button>
-
-          {/* Chat Toggle Button */}
+          />
           <button
-            type="button"
-            onClick={onToggleChat}
-            aria-label="Toggle chat"
+            type="submit"
+            disabled={!inputText.trim()}
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: isChatOpen ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)',
-              color: isChatOpen ? '#ffffff' : '#ffffff',
+              padding: '7px 16px',
+              borderRadius: 'var(--radius-full)',
+              background: inputText.trim()
+                ? 'linear-gradient(135deg, #ff7a3d 0%, #ff5a1f 100%)'
+                : 'rgba(255, 255, 255, 0.08)',
+              color: inputText.trim() ? '#ffffff' : 'rgba(255, 255, 255, 0.35)',
               border: 'none',
-              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: inputText.trim() ? 'pointer' : 'default',
+              transition: 'all 0.2s ease',
             }}
           >
-            <IconChat size={18} />
+            Send
+          </button>
+        </form>
+
+        {/* Primary Row: Left Leave Button, Center Audio/Video/Gift (Message logo removed), Right Next */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            width: '100%',
+          }}
+        >
+          {/* Left: Prominent Leave Button */}
+          <button
+            type="button"
+            onClick={handleLeaveCall}
+            aria-label="Leave call"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px 18px',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: '#ef4444',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.5)',
+              transition: 'transform 0.15s ease, background-color 0.2s ease',
+              flexShrink: 0,
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            <IconClose size={18} />
+            <span>Leave</span>
+          </button>
+
+          {/* Center: Audio / Video / Gift (Message logo removed) */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'rgba(12, 14, 18, 0.8)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-full)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+            }}
+          >
+            {/* Audio (Mute) Button */}
+            <button
+              type="button"
+              onClick={toggleMute}
+              aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                color: isMuted ? '#ef4444' : '#ffffff',
+                border: isMuted ? '1px solid rgba(239, 68, 68, 0.5)' : 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {isMuted ? <IconMicOff size={18} /> : <IconMic size={18} />}
+            </button>
+
+            {/* Video Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleVideo}
+              aria-label={isVideoOff ? 'Turn video on' : 'Turn video off'}
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: isVideoOff ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                color: isVideoOff ? '#ef4444' : '#ffffff',
+                border: isVideoOff ? '1px solid rgba(239, 68, 68, 0.5)' : 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {isVideoOff ? <IconVideoOff size={18} /> : <IconVideo size={18} />}
+            </button>
+
+            {/* Gift Button */}
+            <button
+              type="button"
+              onClick={onOpenGiftModal}
+              aria-label="Send gift"
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                color: 'var(--accent)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <IconGift size={18} />
+            </button>
+          </div>
+
+          {/* Right: Next Stranger Button */}
+          <button
+            type="button"
+            onClick={handleSkipToNext}
+            disabled={lockCountdown > 0}
+            aria-label={lockCountdown > 0 ? `Wait ${lockCountdown}s` : 'Next stranger'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '12px 18px',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: lockCountdown > 0 ? 'rgba(255, 255, 255, 0.1)' : 'var(--accent)',
+              color: lockCountdown > 0 ? 'var(--ink-secondary)' : '#ffffff',
+              border: 'none',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: lockCountdown > 0 ? 'not-allowed' : 'pointer',
+              opacity: lockCountdown > 0 ? 0.7 : 1,
+              boxShadow: lockCountdown > 0 ? 'none' : '0 4px 20px rgba(255, 90, 31, 0.5)',
+              transition: 'all 0.2s ease',
+              flexShrink: 0,
+            }}
+          >
+            <IconBolt size={16} />
+            <span>{lockCountdown > 0 ? `${lockCountdown}s` : 'Next'}</span>
           </button>
         </div>
-
-        {/* Right: Next Stranger Button */}
-        <button
-          type="button"
-          onClick={handleSkipToNext}
-          disabled={lockCountdown > 0}
-          aria-label={lockCountdown > 0 ? `Wait ${lockCountdown}s` : 'Next stranger'}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: '12px 18px',
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: lockCountdown > 0 ? 'rgba(255, 255, 255, 0.1)' : 'var(--accent)',
-            color: lockCountdown > 0 ? 'var(--ink-secondary)' : '#ffffff',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: 700,
-            cursor: lockCountdown > 0 ? 'not-allowed' : 'pointer',
-            opacity: lockCountdown > 0 ? 0.7 : 1,
-            boxShadow: lockCountdown > 0 ? 'none' : '0 4px 20px rgba(255, 90, 31, 0.5)',
-            transition: 'all 0.2s ease',
-            flexShrink: 0,
-          }}
-        >
-          <IconBolt size={16} />
-          <span>{lockCountdown > 0 ? `${lockCountdown}s` : 'Next'}</span>
-        </button>
       </div>
     </div>
   );
