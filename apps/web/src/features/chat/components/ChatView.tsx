@@ -6,6 +6,7 @@ import { Card } from '../../../shared/components/Card';
 import { IconChat, IconVideo } from '../../../shared/components/Icons';
 import { ChatMessage, Stranger } from '../../../shared/types';
 import { chatApi, ConversationItem } from '../apis/chatApi';
+import { moderationApi } from '../../moderation/moderationApi';
 
 interface ChatViewProps {
   stranger: Stranger | null;
@@ -71,6 +72,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
     } catch (err) {
       console.warn('Failed to delete conversation:', err);
       setConversations((prev) => prev.filter((c) => c.id !== id && c._id !== id));
+    }
+  };
+
+  const handleBlockUser = async (partnerId: string, partnerName: string, convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`Block ${partnerName}? You will not match or connect again.`)) return;
+    try {
+      await moderationApi.blockUser({
+        targetUserId: partnerId,
+      });
+      await chatApi.deleteConversation(convId);
+      setConversations((prev) => prev.filter((c) => c.id !== convId && c._id !== convId));
+    } catch (err) {
+      console.warn('Failed to block user:', err);
     }
   };
 
@@ -251,6 +266,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       <IconVideo size={14} /> Call (1🪙)
                     </Button>
                     <button
+                      type="button"
+                      onClick={(e) =>
+                        handleBlockUser(
+                          conv.partner.id,
+                          conv.partner.display_name,
+                          conv.id || conv._id,
+                          e
+                        )
+                      }
+                      title="Block user"
+                      style={{
+                        padding: '4px 8px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: '#ef4444',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Block
+                    </button>
+                    <button
+                      type="button"
                       onClick={(e) => handleDeleteConversation(conv.id || conv._id, e)}
                       title="Remove from inbox"
                       style={{

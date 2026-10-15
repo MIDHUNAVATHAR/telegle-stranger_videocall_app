@@ -8,10 +8,10 @@ import { VirtualGift } from '../../../shared/types';
 import { giftsApi } from '../giftsApi';
 
 const DEFAULT_GIFTS: IVirtualGift[] = [
-  { id: 'gift_rose_10c', name: 'Rose', slug: 'rose-10c', coinPrice: 10, creatorEarningPaise: 700, iconUrl: '🌹' },
+  { id: 'gift_rose_5c', name: 'Rose', slug: 'rose-5c', coinPrice: 5, creatorEarningPaise: 350, iconUrl: '🌹' },
+  { id: 'gift_banana_10c', name: 'Banana', slug: 'banana-10c', coinPrice: 10, creatorEarningPaise: 700, iconUrl: '🍌' },
   { id: 'gift_heart_25c', name: 'Heart Glow', slug: 'heart-25c', coinPrice: 25, creatorEarningPaise: 1750, iconUrl: '💖' },
-  { id: 'gift_sparkler_50c', name: 'Sparkler', slug: 'sparkler-50c', coinPrice: 50, creatorEarningPaise: 3500, iconUrl: '✨' },
-  { id: 'gift_crown_200c', name: 'Royal Crown', slug: 'crown-200c', coinPrice: 200, creatorEarningPaise: 14000, iconUrl: '👑' },
+  { id: 'gift_crown_100c', name: 'Royal Crown', slug: 'crown-100c', coinPrice: 100, creatorEarningPaise: 7000, iconUrl: '👑' },
 ];
 
 interface GiftModalProps {
@@ -50,7 +50,7 @@ export const GiftModal: React.FC<GiftModalProps> = ({
   }, [isOpen]);
 
   const handleGiftClick = async (gift: IVirtualGift) => {
-    if (coins < gift.coinPrice) return;
+    if (coins < gift.coinPrice || isSending) return;
     setIsSending(true);
     setErrorMessage(null);
 
@@ -68,7 +68,7 @@ export const GiftModal: React.FC<GiftModalProps> = ({
         name: gift.name,
         cost: gift.coinPrice,
         icon: gift.iconUrl,
-        description: `70% creator share (₹${(gift.creatorEarningPaise / 100).toFixed(2)})`,
+        description: `Sent ${gift.name}`,
       });
       onClose();
     } catch (err: unknown) {
@@ -87,8 +87,9 @@ export const GiftModal: React.FC<GiftModalProps> = ({
             role="alert"
             style={{
               padding: '10px 14px',
-              backgroundColor: '#7f1d1d',
-              color: '#fff',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid #ef4444',
+              color: '#ef4444',
               borderRadius: 'var(--radius-sm)',
               fontSize: 'var(--step-small)',
               textAlign: 'center',
@@ -107,6 +108,7 @@ export const GiftModal: React.FC<GiftModalProps> = ({
             padding: 'var(--space-12) var(--space-16)',
             backgroundColor: 'var(--surface-raised)',
             borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
           }}
         >
           <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
@@ -152,19 +154,19 @@ export const GiftModal: React.FC<GiftModalProps> = ({
                   transition: 'background-color var(--t-quick) ease, transform var(--t-press) ease',
                   textAlign: 'center',
                   gap: '8px',
-                  border: '1px solid #1e2230',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
                 }}
               >
                 <div
                   style={{
-                    width: '48px',
-                    height: '48px',
+                    width: '52px',
+                    height: '52px',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor: 'var(--surface)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '24px',
+                    fontSize: '28px',
                   }}
                 >
                   {gift.iconUrl ? gift.iconUrl : <IconGift size={24} />}
@@ -190,19 +192,16 @@ export const GiftModal: React.FC<GiftModalProps> = ({
                 >
                   <IconBolt size={14} /> {gift.coinPrice} Coins
                 </span>
-                <span style={{ fontSize: '11px', color: '#10b981' }}>
-                  Creator earns ₹{(gift.creatorEarningPaise / 100).toFixed(2)}
-                </span>
               </button>
             );
           })}
         </div>
 
-        {coins < 10 && (
+        {coins < 5 && (
           <p
             style={{
               fontSize: 'var(--step-small)',
-              color: 'var(--ink-tertiary)',
+              color: 'var(--ink-secondary)',
               textAlign: 'center',
             }}
           >

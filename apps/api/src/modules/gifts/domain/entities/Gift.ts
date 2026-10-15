@@ -22,15 +22,26 @@ export interface IGiftTransferEntity {
 
 export const SEED_GIFTS: IGiftEntity[] = [
   {
-    id: 'gift_rose_10c',
+    id: 'gift_rose_5c',
     name: 'Rose',
-    slug: 'rose-10c',
-    coinPrice: 10,
-    creatorEarningPaise: 700, // ₹7.00
-    platformFeePaise: 300, // ₹3.00
+    slug: 'rose-5c',
+    coinPrice: 5,
+    creatorEarningPaise: 350, // ₹3.50
+    platformFeePaise: 150, // ₹1.50
     iconUrl: '🌹',
     isActive: true,
     displayOrder: 1,
+  },
+  {
+    id: 'gift_banana_10c',
+    name: 'Banana',
+    slug: 'banana-10c',
+    coinPrice: 10,
+    creatorEarningPaise: 700, // ₹7.00
+    platformFeePaise: 300, // ₹3.00
+    iconUrl: '🍌',
+    isActive: true,
+    displayOrder: 2,
   },
   {
     id: 'gift_heart_25c',
@@ -41,26 +52,15 @@ export const SEED_GIFTS: IGiftEntity[] = [
     platformFeePaise: 750, // ₹7.50
     iconUrl: '💖',
     isActive: true,
-    displayOrder: 2,
-  },
-  {
-    id: 'gift_sparkler_50c',
-    name: 'Sparkler',
-    slug: 'sparkler-50c',
-    coinPrice: 50,
-    creatorEarningPaise: 3500, // ₹35.00
-    platformFeePaise: 1500, // ₹15.00
-    iconUrl: '✨',
-    isActive: true,
     displayOrder: 3,
   },
   {
-    id: 'gift_crown_200c',
+    id: 'gift_crown_100c',
     name: 'Royal Crown',
-    slug: 'crown-200c',
-    coinPrice: 200,
-    creatorEarningPaise: 14000, // ₹140.00
-    platformFeePaise: 6000, // ₹60.00
+    slug: 'crown-100c',
+    coinPrice: 100,
+    creatorEarningPaise: 7000, // ₹70.00
+    platformFeePaise: 3000, // ₹30.00
     iconUrl: '👑',
     isActive: true,
     displayOrder: 4,

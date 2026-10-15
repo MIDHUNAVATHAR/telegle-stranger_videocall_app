@@ -31,6 +31,17 @@ function AppContent() {
   const [user, setUser] = useState(INITIAL_USER);
 
   useEffect(() => {
+    if (authUser) {
+      setUser((prev) => ({
+        ...prev,
+        id: authUser.id || authUser._id || prev.id,
+        name: authUser.display_name || authUser.username || prev.name,
+        avatar: authUser.avatar_url || prev.avatar,
+      }));
+    }
+  }, [authUser]);
+
+  useEffect(() => {
     if (isAuthenticated) {
       walletApi
         .getBalance()

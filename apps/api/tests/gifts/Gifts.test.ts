@@ -62,11 +62,17 @@ describe('Phase 8: Virtual Gifts & Coin Economy Module', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.length).toBe(4);
 
-      const rose = res.body.data.find((g: any) => g.slug === 'rose-10c');
+      const rose = res.body.data.find((g: any) => g.slug === 'rose-5c');
       expect(rose).toBeDefined();
-      expect(rose.coinPrice).toBe(10);
-      expect(rose.creatorEarningPaise).toBe(700); // ₹7.00
-      expect(rose.platformFeePaise).toBe(300); // ₹3.00
+      expect(rose.coinPrice).toBe(5);
+      expect(rose.creatorEarningPaise).toBe(350); // ₹3.50
+      expect(rose.platformFeePaise).toBe(150); // ₹1.50
+
+      const banana = res.body.data.find((g: any) => g.slug === 'banana-10c');
+      expect(banana).toBeDefined();
+      expect(banana.coinPrice).toBe(10);
+      expect(banana.creatorEarningPaise).toBe(700); // ₹7.00
+      expect(banana.platformFeePaise).toBe(300); // ₹3.00
     });
   });
 
@@ -76,7 +82,7 @@ describe('Phase 8: Virtual Gifts & Coin Economy Module', () => {
         .post('/api/v1/gifts/send')
         .set('Authorization', `Bearer ${senderToken}`)
         .send({
-          giftSlug: 'rose-10c',
+          giftSlug: 'banana-10c',
           recipientUserId: senderUser.id,
         });
 
@@ -89,7 +95,7 @@ describe('Phase 8: Virtual Gifts & Coin Economy Module', () => {
         .post('/api/v1/gifts/send')
         .set('Authorization', `Bearer ${senderToken}`)
         .send({
-          giftSlug: 'rose-10c',
+          giftSlug: 'banana-10c',
           recipientUserId: recipientUser.id,
         });
 
@@ -107,12 +113,12 @@ describe('Phase 8: Virtual Gifts & Coin Economy Module', () => {
         'admin_grant'
       );
 
-      // 2. Sender sends 'rose-10c' (10 coins) to recipient
+      // 2. Sender sends 'banana-10c' (10 coins) to recipient
       const sendRes = await request(app)
         .post('/api/v1/gifts/send')
         .set('Authorization', `Bearer ${senderToken}`)
         .send({
-          giftSlug: 'rose-10c',
+          giftSlug: 'banana-10c',
           recipientUserId: recipientUser.id,
           matchSessionId: 'sess_call_789',
         });
@@ -120,7 +126,7 @@ describe('Phase 8: Virtual Gifts & Coin Economy Module', () => {
       expect(sendRes.status).toBe(200);
       expect(sendRes.body.success).toBe(true);
       expect(sendRes.body.data.remainingCoins).toBe(40);
-      expect(sendRes.body.data.gift.slug).toBe('rose-10c');
+      expect(sendRes.body.data.gift.slug).toBe('banana-10c');
       expect(sendRes.body.data.transferId).toBeDefined();
 
       // 3. Verify sender's remaining coin balance is 40
