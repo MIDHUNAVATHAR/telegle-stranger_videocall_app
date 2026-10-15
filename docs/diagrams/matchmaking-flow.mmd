@@ -1,0 +1,68 @@
+sequenceDiagram
+    autonumber
+    actor Alice as Alice (Client A)
+    actor Bob as Bob (Client B)
+    participant WS as Socket.IO Server (/matchmaking)
+    participant Engine as Matchmaking Service
+    participant Redis as Redis (Queues, Locks, Presence)
+    participant Mongo as MongoDB (Wallets, Matches)
+
+    %% Step 1: Presence
+    note over Alice, Bob: 1. Continuous Online Presence Heartbeat
+    Alice->>WS: ping { userId: "userA" } (every 25s)
+    WS->>Redis: SADD presence:online_users "userA" & SETEX presence:user:userA 60 "online"
+    Bob->>WS: ping { userId: "userB" } (every 25s)
+    WS->>Redis: SADD presence:online_users "userB" & SETEX presence:user:userB 60 "online"
+    WS-->>Alice: presence_update { onlineCount: SCARD presence:online_users }
+
+    %% Step 2: Queue Join
+    note over Alice, Redis: 2. Alice requests Gender-Filtered Match (Female, 1 Coin)
+    Alice->>WS: join_queue { filter: "FEMALE", userId: "userA" }
+    WS->>Mongo: Check wallet purchased_coins_balance >= 1
+    alt Insufficient Balance
+        WS-->>Alice: queue_error { code: "INSUFFICIENT_COINS", balance: 0 }
+    else Balance Available
+        WS->>Redis: SETEX match:reserved_coin:userA 60 "1" (Reserve 1 coin temporarily)
+        WS->>Redis: ZADD match:queue:female <current_timestamp> "userA"
+        WS-->>Alice: queue_joined { status: "SEARCHING", queue: "FEMALE", coinReserved: true }
+    end
+
+    %% Step 3: Bob enters free queue
+    note over Bob, Redis: 3. Bob enters Free Random Queue
+    Bob->>WS: join_queue { filter: "ANY", userId: "userB", gender: "FEMALE" }
+    WS->>Redis: ZADD match:queue:any <current_timestamp> "userB"
+    WS-->>Bob: queue_joined { status: "SEARCHING", queue: "ANY" }
+
+    %% Step 4: Engine Pairing & Atomic Lua Lock
+    note over Engine, Redis: 4. Matchmaking Engine discovers candidate pair (Alice & Bob)
+    Engine->>Redis: Check blocks / 24h reports: SISMEMBER block:userA "userB"
+    alt User is blocked or mutually reported
+        Engine->>Engine: Skip candidate, evaluate next in queue
+    else No blocks found
+        Engine->>Redis: EVALSHA match_reserve.lua ("userA", "userB", sessionId)
+        Note over Redis: Atomically remove both from queues,<br/>create match:session:<sessionId> lock
+        Redis-->>Engine: 1 (Reservation Succeeded)
+
+        Engine->>WS: Emit match_found { sessionId, role, peerDetails }
+        WS-->>Alice: match_found { sessionId, partnerName: "Bob", timeoutSec: 10 }
+        WS-->>Bob: match_found { sessionId, partnerName: "Alice", timeoutSec: 10 }
+    end
+
+    %% Step 5: Acceptance & Deduction
+    note over Alice, Mongo: 5. Handshake Confirmation & Coin Settlement
+    Alice->>WS: accept_match { sessionId }
+    Bob->>WS: accept_match { sessionId }
+
+    alt Both Accepted within 10 seconds
+        WS->>Mongo: START TRANSACTION: Deduct 1 coin from Alice, insert WalletTransaction
+        WS->>Mongo: INSERT Matches { session_id, user_a_id, user_b_id, coin_charged: 1, status: "CONNECTED" }
+        WS->>Mongo: COMMIT TRANSACTION
+        WS->>Redis: DEL match:reserved_coin:userA (Reservation finalized into debit)
+        WS-->>Alice: call_ready { sessionId, offerAllowed: true }
+        WS-->>Bob: call_ready { sessionId, offerAllowed: false }
+    else Alice or Bob Times Out / Declines / Disconnects
+        WS->>Redis: DEL match:session:<sessionId>
+        WS->>Redis: DEL match:reserved_coin:userA (Release reserved coin back to Alice)
+        WS-->>Alice: match_cancelled { reason: "PARTNER_TIMEOUT", coinRefunded: true }
+        WS-->>Bob: match_cancelled { reason: "DECLINED" }
+    end

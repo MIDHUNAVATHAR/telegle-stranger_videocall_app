@@ -21,12 +21,17 @@ export const validateRequest = (schema: RequestValidationSchema) => {
         req.params = (await schema.params.parseAsync(req.params)) as unknown as Request['params'];
       }
       next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const issues = error.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          message: issue.message,
-        }));
+    } catch (error: unknown) {
+      if (
+        error instanceof ZodError ||
+        (error && typeof error === 'object' && ('issues' in error || (error as { name?: string }).name === 'ZodError'))
+      ) {
+        const issues = ((error as { issues?: Array<{ path: (string | number)[]; message: string }> }).issues || []).map(
+          (issue) => ({
+            path: Array.isArray(issue.path) ? issue.path.join('.') : String(issue.path || ''),
+            message: issue.message,
+          })
+        );
         next(new ValidationError('Invalid request payload', issues));
         return;
       }

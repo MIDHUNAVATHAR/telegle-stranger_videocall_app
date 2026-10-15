@@ -1,0 +1,146 @@
+erDiagram
+    USERS ||--|| USER_PREFERENCES : "has configuration"
+    USERS ||--|| WALLETS : "owns balance"
+    USERS ||--o{ WALLET_TRANSACTIONS : "incurs ledger entries"
+    USERS ||--o{ CONVERSATIONS : "participates in"
+    USERS ||--o{ MATCHES : "joins as caller/receiver"
+    USERS ||--o{ GIFT_TRANSFERS : "sends / receives"
+    USERS ||--o{ WITHDRAWALS : "requests cash payout"
+    USERS ||--o{ REPORTS : "files / receives"
+    USERS ||--o{ BLOCKS : "initiates / targeted"
+
+    GIFTS ||--o{ GIFT_TRANSFERS : "sent as"
+    WALLETS ||--o{ WALLET_TRANSACTIONS : "records ledger changes"
+    MATCHES ||--o{ GIFT_TRANSFERS : "in-call context"
+
+    USERS {
+        ObjectId _id PK
+        string email UK "nullable, lowercase"
+        string google_id UK "nullable"
+        string display_name "Required, min 2 max 30"
+        int age "Required, minimum 18"
+        string gender "MALE | FEMALE | NON_BINARY | PREFER_NOT_TO_SAY"
+        string avatar_url "Cloudinary secure URL"
+        string bio "Max 200 chars"
+        string role "USER | MODERATOR | ADMIN"
+        boolean is_banned "Default false"
+        date banned_until "Nullable, active ban cutoff"
+        date created_at
+        date updated_at
+    }
+
+    USER_PREFERENCES {
+        ObjectId _id PK
+        ObjectId user_id FK "Unique reference to USERS"
+        string preferred_gender "ANY | MALE | FEMALE"
+        boolean allow_incoming_calls "Default true"
+        boolean sound_enabled "Default true"
+        date updated_at
+    }
+
+    WALLETS {
+        ObjectId _id PK
+        ObjectId user_id FK "Unique reference to USERS"
+        int purchased_coins_balance "Non-withdrawable coin inventory (min 0)"
+        int withdrawable_earnings_paise "Earned creator cash in INR paise (min 0)"
+        int version "Optimistic locking counter"
+        date updated_at
+    }
+
+    WALLET_TRANSACTIONS {
+        ObjectId _id PK
+        ObjectId wallet_id FK
+        ObjectId user_id FK
+        string type "COIN_PURCHASE | GENDER_FILTER_DEBIT | DIRECT_CALL_DEBIT | GIFT_SENT_DEBIT | GIFT_RECEIVED_CREDIT | WITHDRAWAL_DEBIT | REFUND_CREDIT"
+        int coins_amount "Delta (+ or - coins)"
+        int currency_amount_paise "Delta (+ or - paise)"
+        string idempotency_key UK "Unique payment or payout transaction key"
+        string reference_type "RAZORPAY_ORDER | MATCH | CONVERSATION | GIFT | WITHDRAWAL"
+        string reference_id "External or internal entity ID"
+        string status "PENDING | COMPLETED | FAILED | REVERSED"
+        json metadata "Context details (e.g. gateway signatures, gift ids)"
+        date created_at
+    }
+
+    CONVERSATIONS {
+        ObjectId _id PK
+        array participant_ids "Array of exactly 2 user ObjectIds"
+        ObjectId last_call_match_id "Reference to MATCHES"
+        date last_interaction_at "Sort key for inbox"
+        array hidden_by_user_ids "Soft-deleted user IDs for individual hiding"
+        date created_at
+        date updated_at
+    }
+
+    MATCHES {
+        ObjectId _id PK
+        string session_id UK "UUIDv4 signaling room identifier"
+        ObjectId user_a_id FK "Initiator / Caller"
+        ObjectId user_b_id FK "Matched / Callee"
+        string match_type "RANDOM_FREE | GENDER_FILTER_PAID | DIRECT_INBOX_CALL"
+        int coin_charged "0 or 1"
+        ObjectId charged_user_id FK "Nullable user who paid"
+        string status "INITIATED | CONNECTED | COMPLETED | SKIPPED | FAILED | REPORTED"
+        int duration_seconds "Call active duration"
+        date started_at
+        date connected_at
+        date ended_at
+    }
+
+    GIFTS {
+        ObjectId _id PK
+        string name "E.g. Rose, Sparkler, Crown"
+        string slug UK "E.g. rose-10c"
+        int coin_price "Cost to sender (e.g. 10, 50, 200)"
+        int creator_earning_paise "Creator value in paise (70% split)"
+        string icon_url "Static icon asset"
+        string animation_url "Lottie / SVG particle asset"
+        boolean is_active "Default true"
+        int display_order "Ordering sequence in picker"
+    }
+
+    GIFT_TRANSFERS {
+        ObjectId _id PK
+        ObjectId gift_id FK
+        ObjectId sender_id FK
+        ObjectId recipient_id FK
+        ObjectId match_id FK "Call context where gift was awarded"
+        int coins_spent "Price in coins"
+        int creator_earnings_paise "Amount credited to recipient wallet"
+        int platform_fee_paise "Platform commission"
+        date created_at
+    }
+
+    WITHDRAWALS {
+        ObjectId _id PK
+        ObjectId user_id FK
+        int amount_paise "Minimum 50,000 paise (₹500)"
+        string upi_id "Validated UPI VPA format"
+        string idempotency_key UK
+        string razorpayx_payout_id "Gateway reference"
+        string status "PENDING | PROCESSING | COMPLETED | REJECTED | FAILED"
+        string rejection_reason "Admin or gateway error"
+        date created_at
+        date processed_at
+    }
+
+    REPORTS {
+        ObjectId _id PK
+        ObjectId reporter_id FK
+        ObjectId reported_user_id FK
+        ObjectId match_id FK "Nullable call context"
+        string reason "HARASSMENT | NUDITY_INAPPROPRIATE | UNDERAGE | SPAM | OTHER"
+        string details "Optional free-text (max 500 chars)"
+        string status "PENDING | ACTIONED | DISMISSED"
+        string action_taken "NONE | WARNING | 24H_BAN | PERMANENT_BAN"
+        date created_at
+    }
+
+    BLOCKS {
+        ObjectId _id PK
+        ObjectId user_id FK "Blocker"
+        ObjectId blocked_user_id FK "Blocked user"
+        string reason "USER_INITIATED | POST_REPORT_AUTO"
+        date expires_at "Nullable, 24h for auto-report block, null for permanent"
+        date created_at
+    }

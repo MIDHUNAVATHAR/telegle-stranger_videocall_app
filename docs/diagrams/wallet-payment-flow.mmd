@@ -1,0 +1,71 @@
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant Client as Next.js Web App
+    participant API as Donkey Play API
+    participant Razorpay as Razorpay Gateway
+    participant Redis as Redis (Idempotency Cache)
+    participant DB as MongoDB (Wallets & Ledger)
+    participant RazorpayX as RazorpayX Payouts API
+
+    %% Path A: Coin Pack Purchase
+    rect rgb(240, 255, 240)
+        note over User, Razorpay: Flow A: Purchasing Non-Withdrawable Coins (e.g., ₹10 for 10 Coins)
+        User->>Client: Selects Coin Pack (10 Coins for ₹10)
+        Client->>API: POST /api/v1/wallet/orders { packageId: "pack_10" }
+        API->>Razorpay: Create Order { amount: 1000, currency: "INR", receipt: "ord_xxx" }
+        Razorpay-->>API: { id: "order_rzp_123", amount: 1000, currency: "INR" }
+        API-->>Client: { orderId: "order_rzp_123", amount: 1000, keyId: "rzp_test_xxx" }
+
+        Client->>Razorpay: Open Razorpay Checkout modal (UPI / Cards / Netbanking)
+        User->>Razorpay: Completes payment
+        Razorpay-->>Client: { razorpay_payment_id: "pay_987", razorpay_order_id: "order_rzp_123", razorpay_signature: "sig_abc" }
+
+        alt Path A.1: Client Verification Handshake
+            Client->>API: POST /api/v1/wallet/orders/verify { orderId, paymentId, signature }
+            API->>API: Verify HMAC SHA256 (orderId + "|" + paymentId, secret)
+        else Path A.2: Direct Webhook from Razorpay
+            Razorpay->>API: POST /api/v1/wallet/webhook { event: "payment.captured", payload }
+            API->>API: Verify X-Razorpay-Signature HMAC SHA256 header
+        end
+
+        API->>Redis: SETNX idempotency:pay:pay_987 "PROCESSING" (TTL 24h)
+        alt Duplicate Event (Already Processed)
+            Redis-->>API: 0 (Key exists)
+            API-->>Client: 200 OK (Already credited)
+        else First-Time Processing
+            Redis-->>API: 1 (Acquired)
+            API->>DB: START TRANSACTION
+            API->>DB: UPDATE Wallets INC purchased_coins_balance by 10
+            API->>DB: INSERT WalletTransactions { type: "COIN_PURCHASE", coins: +10, currency_paise: +1000, idempotency_key: "pay_987", status: "COMPLETED" }
+            API->>DB: COMMIT TRANSACTION
+            API-->>Client: 200 OK { newCoinBalance: 10, message: "Coins credited successfully" }
+        end
+    end
+
+    %% Path B: Earnings Withdrawal
+    rect rgb(255, 245, 238)
+        note over User, RazorpayX: Flow B: Withdrawing Creator Earnings to UPI (Min ₹500 / 50,000 paise)
+        User->>Client: Submits Withdrawal { amountPaise: 50000, upiId: "alex.morgan@oksbi" }
+        Client->>API: POST /api/v1/wallet/withdrawals { amountPaise: 50000, upiId: "alex.morgan@oksbi", idempotencyKey: "uuid_req_1" }
+
+        API->>API: Validate amount >= 50000 AND UPI regex format
+        API->>DB: Query Wallet where user_id = current AND withdrawable_earnings_paise >= 50000
+        alt Insufficient Withdrawable Balance
+            API-->>Client: 400 Bad Request { code: "INSUFFICIENT_EARNINGS_BALANCE" }
+        else Balance Valid
+            API->>DB: START TRANSACTION
+            API->>DB: Deduct 50,000 paise from withdrawable_earnings_paise
+            API->>DB: INSERT Withdrawals { amount_paise: 50000, upi_id: "alex.morgan@oksbi", status: "PROCESSING" }
+            API->>DB: INSERT WalletTransactions { type: "WITHDRAWAL_DEBIT", coins: 0, currency_paise: -50000, status: "PENDING" }
+            API->>DB: COMMIT TRANSACTION
+
+            API->>RazorpayX: POST /v1/payouts { fund_account: { vpa: "alex.morgan@oksbi" }, amount: 50000, mode: "UPI" }
+            RazorpayX-->>API: { id: "pout_456", status: "processing" }
+            API-->>Client: 201 Created { status: "PROCESSING", withdrawalId: "wd_123" }
+
+            RazorpayX->>API: Webhook POST /api/v1/wallet/webhook/payout { event: "payout.processed", id: "pout_456" }
+            API->>DB: UPDATE Withdrawals SET status="COMPLETED", processed_at=now
+            API->>DB: UPDATE WalletTransactions SET status="COMPLETED" WHERE reference_id="wd_123"
+        end
+    end

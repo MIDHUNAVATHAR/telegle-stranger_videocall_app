@@ -1,0 +1,70 @@
+sequenceDiagram
+    autonumber
+    actor User as User (Browser/Mobile)
+    participant Client as Next.js Web Client
+    participant API as Donkey Play API Gateway
+    participant Redis as Redis Cache
+    participant Brevo as Brevo Email API
+    participant Google as Google Identity API
+    participant Mongo as MongoDB
+
+    %% Email OTP Flow
+    rect rgb(255, 245, 240)
+        note over User, Brevo: Path A: Passwordless Email OTP Login
+        User->>Client: Enters email and submits
+        Client->>API: POST /api/v1/auth/otp/send { email }
+        API->>Redis: Check ratelimit:otp:email:<email> & cooldown (60s)
+        alt Rate limit exceeded (< 60s cooldown or > 5 req/hour)
+            Redis-->>API: Limit exceeded
+            API-->>Client: 429 Too Many Requests (Retry-After header)
+        else Rate limit OK
+            API->>Redis: Store OTP record: auth:otp:<email> (hashed, 5m TTL, max_attempts=3)
+            API->>Brevo: POST /v3/smtp/email (Send 6-digit verification code)
+            Brevo-->>API: 201 Created (Message ID)
+            API-->>Client: 200 OK { message: "OTP sent to email", expires_in: 300 }
+            Client-->>User: Display 6-digit OTP input form with 60s resend timer
+        end
+
+        User->>Client: Enters 6-digit code
+        Client->>API: POST /api/v1/auth/otp/verify { email, code }
+        API->>Redis: GET auth:otp:<email> & check attempts counter
+        alt Invalid code / Attempts exceeded (> 3)
+            API->>Redis: INCR attempts counter
+            API-->>Client: 400 Bad Request { error: "INVALID_OTP", remaining_attempts }
+        else Code matches
+            API->>Redis: DEL auth:otp:<email> (Consume OTP immediately)
+            API->>Mongo: Find User by email
+            alt User exists
+                Mongo-->>API: Return existing user record
+            else User does not exist (Auto-Registration)
+                API->>Mongo: INSERT Users { email, display_name: "Player_XXXX", age: 18, is_banned: false }
+                API->>Mongo: INSERT UserPreferences { user_id, preferred_gender: "ANY" }
+                API->>Mongo: INSERT Wallets { user_id, purchased_coins: 0, withdrawable_paise: 0 }
+                Mongo-->>API: User created
+            end
+            API->>API: Sign JWT Access Token (15m) & Refresh Token (7d)
+            API-->>Client: 200 OK + Set-Cookie (access_token, refresh_token HttpOnly) + User profile
+            Client-->>User: Redirect to Matchmaking Dashboard
+        end
+    end
+
+    %% Google Sign-In Flow
+    rect rgb(240, 248, 255)
+        note over User, Google: Path B: Google OAuth 2.0 Sign-In
+        User->>Client: Clicks "Continue with Google"
+        Client->>Google: Authenticate & receive Google ID Token (JWT)
+        Client->>API: POST /api/v1/auth/google { id_token }
+        API->>Google: Verify token signature via google-auth-library
+        Google-->>API: Token payload { email, sub: google_id, name, picture }
+        API->>Mongo: Find User by google_id OR email
+        alt User exists
+            API->>Mongo: Update last_login_at
+        else User does not exist (Auto-Registration)
+            API->>Mongo: INSERT Users { email, google_id, display_name: name, avatar_url: picture, age: 18 }
+            API->>Mongo: INSERT UserPreferences { user_id, preferred_gender: "ANY" }
+            API->>Mongo: INSERT Wallets { user_id, purchased_coins: 0, withdrawable_paise: 0 }
+        end
+        API->>API: Sign JWT Access Token (15m) & Refresh Token (7d)
+        API-->>Client: 200 OK + Set-Cookie (HttpOnly JWTs) + User profile
+        Client-->>User: Redirect to Matchmaking Dashboard
+    end

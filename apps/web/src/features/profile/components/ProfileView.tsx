@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../../../shared/components/Card';
 import { Button } from '../../../shared/components/Button';
 import { Badge } from '../../../shared/components/Badge';
 import { IconSettings, IconStar } from '../../../shared/components/Icons';
-import { UserProfile } from '../../../shared/types';
+import { UserProfile as SharedUserProfile } from '../../../shared/types';
+import { EditProfileModal } from './EditProfileModal';
+import { PreferencesModal } from './PreferencesModal';
+import { profileApi, UserPreferences } from '../apis/profileApi';
 
 interface ProfileViewProps {
-  user: UserProfile;
+  user: SharedUserProfile;
   onUpdateBio: (newBio: string) => void;
   onOpenSettings: () => void;
 }
@@ -20,10 +23,54 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 }) => {
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioText, setBioText] = useState(user.bio);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    preferredGender: 'ANY',
+    allowIncomingCalls: true,
+    soundEnabled: true,
+  });
 
-  const handleSaveBio = () => {
+  const [localProfile, setLocalProfile] = useState({
+    name: user.name,
+    bio: user.bio,
+    avatar: user.avatar,
+    age: 22,
+    gender: 'MALE',
+  });
+
+  useEffect(() => {
+    // Attempt to fetch profile & preferences from API
+    profileApi.getMyProfile()
+      .then((data) => {
+        if (data && data.user) {
+          setLocalProfile({
+            name: data.user.display_name || data.user.username || user.name,
+            bio: data.user.bio || user.bio,
+            avatar: data.user.avatar_url || user.avatar,
+            age: data.user.age || 22,
+            gender: data.user.gender || 'MALE',
+          });
+          setBioText(data.user.bio || user.bio);
+        }
+        if (data && data.preferences) {
+          setPreferences(data.preferences);
+        }
+      })
+      .catch(() => {
+        // Guest user or offline, fall back to props
+      });
+  }, [user.name, user.bio, user.avatar]);
+
+  const handleSaveBio = async () => {
     onUpdateBio(bioText);
     setIsEditingBio(false);
+    try {
+      await profileApi.updateProfile({ bio: bioText });
+      setLocalProfile((prev) => ({ ...prev, bio: bioText }));
+    } catch {
+      // Local fallback already applied
+    }
   };
 
   return (
@@ -42,8 +89,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       >
         <div style={{ position: 'relative' }}>
           <img
-            src={user.avatar}
-            alt={user.name}
+            src={localProfile.avatar}
+            alt={localProfile.name}
             style={{
               width: '88px',
               height: '88px',
@@ -67,15 +114,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         <div>
-          <h1 style={{ fontSize: 'var(--step-lead)', fontWeight: 800 }}>{user.name}</h1>
+          <h1 style={{ fontSize: 'var(--step-lead)', fontWeight: 800 }}>
+            {localProfile.name}, {localProfile.age}
+          </h1>
           <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
             {user.tag} · {user.country}
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <Badge variant="accent">Verified Human</Badge>
-          <Badge variant="success">Karma 99%</Badge>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px' }}>
+          <Badge variant="accent">18+ Verified Human</Badge>
+          <Badge variant="success">Karma 100%</Badge>
+          <Badge variant="default">Strictly No Nudity</Badge>
         </div>
 
         {/* Bio Section */}
@@ -85,6 +135,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <textarea
                 value={bioText}
                 onChange={(e) => setBioText(e.target.value)}
+                maxLength={300}
                 style={{
                   width: '100%',
                   minHeight: '70px',
@@ -92,7 +143,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   color: 'var(--ink)',
                   borderRadius: 'var(--radius-sm)',
                   padding: '10px',
-                  border: 'none',
+                  border: '1px solid #2a3042',
                   fontSize: 'var(--step-body)',
                 }}
               />
@@ -117,7 +168,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 color: 'var(--ink)',
               }}
             >
-              {user.bio}
+              {localProfile.bio || 'No bio yet. Tap to add your bio!'}
               <span
                 style={{
                   display: 'block',
@@ -131,6 +182,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           )}
         </div>
+
+        {/* Edit Profile Button */}
+        <Button
+          variant="secondary"
+          size="sm"
+          fullWidth
+          onClick={() => setIsEditModalOpen(true)}
+        >
+          Edit Profile & Photo
+        </Button>
       </Card>
 
       {/* Stats Board */}
@@ -188,6 +249,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </Card>
       </div>
 
+      {/* Matching Preferences Quick Card */}
+      <Card
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          cursor: 'pointer',
+        }}
+        onClick={() => setIsPreferencesModalOpen(true)}
+      >
+        <div>
+          <strong style={{ fontSize: 'var(--step-body)', display: 'block' }}>
+            Match Gender Filter
+          </strong>
+          <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
+            Current: {preferences.preferredGender === 'ANY' ? 'Anyone (Free)' : preferences.preferredGender}
+          </span>
+        </div>
+        <Button variant="ghost" size="sm">
+          Change
+        </Button>
+      </Card>
+
       {/* Interests */}
       <Card style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <h2 style={{ fontSize: 'var(--step-body)', fontWeight: 700 }}>My Interests</h2>
@@ -202,8 +286,39 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* Settings Action Button */}
       <Button variant="secondary" size="md" fullWidth onClick={onOpenSettings}>
-        <IconSettings size={18} /> App & Privacy Settings
+        <IconSettings size={18} /> App & Safety Settings
       </Button>
+
+      {/* Modals */}
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        initialProfile={{
+          displayName: localProfile.name,
+          bio: localProfile.bio,
+          gender: localProfile.gender,
+          age: localProfile.age,
+          avatarUrl: localProfile.avatar,
+        }}
+        onProfileUpdated={(updated) => {
+          setLocalProfile({
+            name: updated.displayName,
+            bio: updated.bio,
+            gender: updated.gender,
+            age: updated.age,
+            avatar: updated.avatarUrl || localProfile.avatar,
+          });
+          setBioText(updated.bio);
+          onUpdateBio(updated.bio);
+        }}
+      />
+
+      <PreferencesModal
+        isOpen={isPreferencesModalOpen}
+        onClose={() => setIsPreferencesModalOpen(false)}
+        initialPreferences={preferences}
+        onPreferencesUpdated={(updated) => setPreferences(updated)}
+      />
     </div>
   );
 };

@@ -1,0 +1,1357 @@
+openapi: 3.1.0
+info:
+  title: Donkey Play API
+  description: |
+    Production-ready REST and Realtime API documentation for **Donkey Play** — a mobile-first social discovery, random matching, and 1-on-1 video chat application.
+    
+    ### Key Features:
+    - **Passwordless Auth**: Brevo Email OTP & Google OAuth 2.0 with instant auto-registration.
+    - **Live Matchmaking**: Real-time queues, Redis presence, atomic 1-coin reservation.
+    - **P2P Video Calling**: WebRTC signaling with server-enforced 5-second minimum duration lock.
+    - **Dual-Balance Wallet**: Strict segregation between non-withdrawable coins & cashable creator earnings in INR paise.
+    - **Creator UPI Payouts**: RazorpayX disbursement for earnings >= ₹500.
+    - **Automated Moderation**: 5 unique reports in 1 hour triggers an automatic 24-hour server ban.
+  version: 1.0.0
+  contact:
+    name: Donkey Play Engineering
+    email: engineering@donkeyplay.com
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local Development Server
+  - url: https://api.donkeyplay.com/api/v1
+    description: Production API Server
+
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+
+paths:
+  # ============================================================================
+  # Authentication Endpoints
+  # ============================================================================
+  /auth/otp/send:
+    post:
+      summary: Send Email OTP
+      description: Sends a 6-digit verification code via Brevo transactional email. Enforces a 60-second cooldown per email and 10 requests/hour per IP.
+      operationId: sendEmailOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alex.morgan@example.com
+      responses:
+        '200':
+          description: OTP dispatched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSentResponse'
+        '429':
+          description: Rate limit or cooldown exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/otp/verify:
+    post:
+      summary: Verify Email OTP & Login / Auto-Register
+      description: Verifies 6-digit OTP. On first successful authentication, automatically provisions user account, default preferences, and a zero-balance wallet.
+      operationId: verifyEmailOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alex.morgan@example.com
+                code:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                  example: '123456'
+      responses:
+        '200':
+          description: Successfully verified, JWT cookies set
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: dp_access_token=jwt.token...; HttpOnly; Secure; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Invalid OTP or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: User account is currently banned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/google:
+    post:
+      summary: Google OAuth Sign-In & Auto-Register
+      description: Verifies Google Identity Services ID token, provisions user if new, sets JWT session cookies.
+      operationId: verifyGoogleAuth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token:
+                  type: string
+                  description: Google JWT ID token
+      responses:
+        '200':
+          description: Successfully authenticated with Google
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '401':
+          description: Invalid Google token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      summary: Refresh Access Token
+      description: Issues a fresh 15-minute access token using the HttpOnly `dp_refresh_token` cookie.
+      operationId: refreshTokens
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: Logout Session
+      description: Clears authentication cookies and invalidates Redis heartbeat.
+      operationId: logout
+      responses:
+        '200':
+          description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /auth/me:
+    get:
+      summary: Get Authenticated User Identity
+      description: Returns currently logged in user profile, role, and moderation standing.
+      operationId: getAuthMe
+      responses:
+        '200':
+          description: Current user identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # Users & Profile Endpoints
+  # ============================================================================
+  /users/me:
+    get:
+      summary: Get Current User Profile & Preferences
+      operationId: getMyProfile
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileWithPreferencesResponse'
+    patch:
+      summary: Update Current User Profile
+      operationId: updateMyProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /users/me/avatar/sign:
+    post:
+      summary: Generate Signed Cloudinary Upload Signature
+      description: Generates a short-lived (15m) cryptographic signature for direct client-to-Cloudinary upload.
+      operationId: signAvatarUpload
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudinarySignatureResponse'
+
+  /users/me/preferences:
+    patch:
+      summary: Update Matching & Calling Preferences
+      operationId: updatePreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferencesResponse'
+
+  /users/{id}:
+    get:
+      summary: Get Public Profile of a User
+      operationId: getPublicProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserResponse'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # Matchmaking Endpoints
+  # ============================================================================
+  /matching/presence:
+    get:
+      summary: Get Realtime Online Users Count
+      description: Returns the true unique active online users count calculated via Redis cardinality (`SCARD presence:online_users`).
+      operationId: getOnlinePresence
+      security: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      online_count:
+                        type: integer
+                        example: 1420
+
+  /matching/queue/join:
+    post:
+      summary: Join Matchmaking Queue
+      description: Queues the user for free or gender-filtered matching. If gender filter is selected, temporarily reserves 1 coin in Redis.
+      operationId: joinMatchmakingQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filter]
+              properties:
+                filter:
+                  type: string
+                  enum: [ANY, MALE, FEMALE]
+                  example: FEMALE
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueJoinedResponse'
+        '402':
+          description: Insufficient coins for gender-filtered matching
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /matching/queue/leave:
+    post:
+      summary: Leave Matchmaking Queue
+      description: Cancels search and releases any held coin reservation.
+      operationId: leaveMatchmakingQueue
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ============================================================================
+  # Video Calls Endpoints
+  # ============================================================================
+  /calls/{sessionId}:
+    get:
+      summary: Get Active Call Session Info
+      operationId: getCallSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallSessionResponse'
+
+  /calls/{sessionId}/end:
+    post:
+      summary: End Call Session
+      description: Finalizes call teardown. Rejects requests made before 5 seconds have elapsed unless an emergency report is attached.
+      operationId: endCallSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  enum: [NORMAL_EXIT, SKIPPED, REPORTED]
+                  example: NORMAL_EXIT
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: 5-second minimum call countdown not met
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # Conversations & Inbox Endpoints
+  # ============================================================================
+  /conversations:
+    get:
+      summary: List Conversations (Past Call Connections)
+      description: Returns paginated list of previous video call partners for the Messages tab.
+      operationId: listConversations
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationListResponse'
+
+  /conversations/{id}:
+    get:
+      summary: Get Single Conversation Record
+      operationId: getConversationById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationDetailResponse'
+    delete:
+      summary: Soft-Delete Conversation from User's Inbox
+      description: Hides the conversation from the current user's inbox list without deleting it for the other participant.
+      operationId: deleteConversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /conversations/{id}/call:
+    post:
+      summary: Directly Re-Call a Former Partner (Costs 1 Coin)
+      description: Initiates a direct call request. Debits 1 coin from the caller once accepted.
+      operationId: directCallPartner
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirectCallInitiatedResponse'
+        '402':
+          description: Insufficient coins (1 coin required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Partner is not accepting direct incoming calls
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # Wallet & Payments Endpoints
+  # ============================================================================
+  /wallet/balance:
+    get:
+      summary: Get Current Wallet Balances
+      description: Returns separate balances for purchased coins and withdrawable creator earnings (in INR paise).
+      operationId: getWalletBalance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletBalanceResponse'
+
+  /wallet/packages:
+    get:
+      summary: List Coin Purchase Packages
+      description: Returns catalog of coin packs (starting from ₹10 for 10 coins).
+      operationId: getCoinPackages
+      security: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoinPackagesResponse'
+
+  /wallet/orders:
+    post:
+      summary: Create Razorpay Coin Purchase Order
+      operationId: createRazorpayOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [package_id]
+              properties:
+                package_id:
+                  type: string
+                  example: pack_starter_10
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrderResponse'
+
+  /wallet/orders/verify:
+    post:
+      summary: Verify Razorpay Payment & Credit Coins
+      operationId: verifyRazorpayPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [razorpay_order_id, razorpay_payment_id, razorpay_signature]
+              properties:
+                razorpay_order_id:
+                  type: string
+                  example: order_rzp_12345
+                razorpay_payment_id:
+                  type: string
+                  example: pay_rzp_98765
+                razorpay_signature:
+                  type: string
+                  example: 9b2d87e14589d71c...
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentVerifiedResponse'
+
+  /wallet/webhook:
+    post:
+      summary: Razorpay Webhook Endpoint
+      description: Asynchronous payment event receiver. Validates HMAC SHA-256 signature and applies idempotency.
+      operationId: handleRazorpayWebhook
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed successfully
+
+  /wallet/transactions:
+    get:
+      summary: Get Wallet Ledger Transaction History
+      operationId: getTransactionHistory
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsListResponse'
+
+  /wallet/withdrawals:
+    get:
+      summary: List Payout History
+      operationId: listWithdrawals
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WithdrawalListResponse'
+    post:
+      summary: Request UPI Cashout (Min ₹500 / 50,000 Paise)
+      description: Requests creator earnings withdrawal to a validated UPI VPA.
+      operationId: requestWithdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_paise, upi_id]
+              properties:
+                amount_paise:
+                  type: integer
+                  minimum: 50000
+                  example: 50000
+                upi_id:
+                  type: string
+                  pattern: '^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$'
+                  example: alex.morgan@oksbi
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WithdrawalCreatedResponse'
+        '400':
+          description: Amount below ₹500 or invalid UPI VPA format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Pending withdrawal already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /wallet/webhook/payout:
+    post:
+      summary: RazorpayX Payout Webhook
+      description: Handles payout confirmation, failure, or reversal events.
+      operationId: handlePayoutWebhook
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Payout status updated
+
+  # ============================================================================
+  # Virtual Gifts Endpoints
+  # ============================================================================
+  /gifts:
+    get:
+      summary: List Virtual Gifts Catalog
+      operationId: listGifts
+      security: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftListResponse'
+
+  /gifts/send:
+    post:
+      summary: Send Virtual Gift in Call
+      description: Deducts coins from sender, credits 70% earnings (in paise) to recipient, and notifies peer over Socket.IO.
+      operationId: sendGift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gift_id, session_id]
+              properties:
+                gift_id:
+                  type: string
+                  example: 660c2830f3b9c45019a8e050
+                session_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendGiftResponse'
+        '402':
+          description: Insufficient coins to purchase gift
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # Moderation & Safety Endpoints
+  # ============================================================================
+  /moderation/reports:
+    post:
+      summary: Report a User
+      description: Submits violation report. Immediately blocks the reported user for 24 hours. If target receives 5 reports within 1 hour, triggers automated 24-hour server ban.
+      operationId: reportUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reported_user_id, reason]
+              properties:
+                reported_user_id:
+                  type: string
+                  example: 660c2830f3b9c45019a8e002
+                match_id:
+                  type: string
+                  example: 660c2830f3b9c45019a8e040
+                reason:
+                  type: string
+                  enum: [HARASSMENT, NUDITY_INAPPROPRIATE, UNDERAGE, SPAM, OTHER]
+                  example: NUDITY_INAPPROPRIATE
+                details:
+                  type: string
+                  maxLength: 500
+                  example: Inappropriate video behavior during call
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSubmittedResponse'
+
+  /moderation/blocks:
+    get:
+      summary: List Blocked Users
+      operationId: listBlockedUsers
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockListResponse'
+    post:
+      summary: Block a User
+      operationId: blockUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blocked_user_id]
+              properties:
+                blocked_user_id:
+                  type: string
+                  example: 660c2830f3b9c45019a8e002
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /moderation/blocks/{id}:
+    delete:
+      summary: Unblock a User
+      operationId: unblockUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+# ==============================================================================
+# Components & Reusable Schemas
+# ==============================================================================
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: dp_access_token
+      description: HttpOnly JWT access token cookie
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          example: {}
+
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: INSUFFICIENT_COINS
+            message:
+              type: string
+              example: You need at least 1 coin to use gender-filtered matching
+            details:
+              type: array
+              items:
+                type: object
+
+    OtpSentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Verification OTP sent to email
+            expires_in:
+              type: integer
+              example: 300
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            is_new_user:
+              type: boolean
+              example: false
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 660c2830f3b9c45019a8e001
+        email:
+          type: string
+          example: alex.morgan@example.com
+        display_name:
+          type: string
+          example: Alex M
+        age:
+          type: integer
+          example: 22
+        gender:
+          type: string
+          enum: [MALE, FEMALE, NON_BINARY, PREFER_NOT_TO_SAY]
+          example: FEMALE
+        avatar_url:
+          type: string
+          example: https://res.cloudinary.com/donkey-play/image/upload/v1713180000/avatars/u_660c2830.webp
+        bio:
+          type: string
+          example: Chill vibes only 🌴
+        role:
+          type: string
+          enum: [USER, MODERATOR, ADMIN]
+          example: USER
+        is_banned:
+          type: boolean
+          example: false
+
+    UserPreferences:
+      type: object
+      properties:
+        preferred_gender:
+          type: string
+          enum: [ANY, MALE, FEMALE]
+          example: ANY
+        allow_incoming_calls:
+          type: boolean
+          example: true
+        sound_enabled:
+          type: boolean
+          example: true
+
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/User'
+
+    UserProfileWithPreferencesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            preferences:
+              $ref: '#/components/schemas/UserPreferences'
+
+    PublicUserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+            display_name:
+              type: string
+            avatar_url:
+              type: string
+            bio:
+              type: string
+            gender:
+              type: string
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        display_name:
+          type: string
+          minLength: 2
+          maxLength: 30
+        bio:
+          type: string
+          maxLength: 200
+        gender:
+          type: string
+          enum: [MALE, FEMALE, NON_BINARY, PREFER_NOT_TO_SAY]
+        avatar_url:
+          type: string
+
+    UpdatePreferencesRequest:
+      type: object
+      properties:
+        preferred_gender:
+          type: string
+          enum: [ANY, MALE, FEMALE]
+        allow_incoming_calls:
+          type: boolean
+        sound_enabled:
+          type: boolean
+
+    PreferencesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/UserPreferences'
+
+    CloudinarySignatureResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            signature:
+              type: string
+            timestamp:
+              type: integer
+            api_key:
+              type: string
+            folder:
+              type: string
+            cloud_name:
+              type: string
+
+    QueueJoinedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: SEARCHING
+            filter:
+              type: string
+              example: FEMALE
+            coin_reserved:
+              type: boolean
+              example: true
+
+    CallSessionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            session_id:
+              type: string
+            status:
+              type: string
+            started_at:
+              type: string
+            partner:
+              $ref: '#/components/schemas/PublicUserResponse'
+
+    ConversationListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+              partner:
+                $ref: '#/components/schemas/PublicUserResponse'
+              last_interaction_at:
+                type: string
+                format: date-time
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+
+    ConversationDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+            partner:
+              $ref: '#/components/schemas/PublicUserResponse'
+            last_interaction_at:
+              type: string
+              format: date-time
+
+    DirectCallInitiatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            session_id:
+              type: string
+            status:
+              type: string
+              example: RINGING
+
+    WalletBalanceResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            purchased_coins_balance:
+              type: integer
+              example: 45
+            withdrawable_earnings_paise:
+              type: integer
+              example: 62500
+            withdrawable_earnings_inr:
+              type: number
+              example: 625.00
+
+    CoinPackage:
+      type: object
+      properties:
+        id:
+          type: string
+          example: pack_starter_10
+        name:
+          type: string
+          example: Starter Pack
+        base_coins:
+          type: integer
+          example: 10
+        bonus_coins:
+          type: integer
+          example: 0
+        total_coins:
+          type: integer
+          example: 10
+        price_paise:
+          type: integer
+          example: 1000
+        price_inr:
+          type: number
+          example: 10.00
+
+    CoinPackagesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoinPackage'
+
+    CreateOrderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            order_id:
+              type: string
+              example: order_rzp_98765
+            amount:
+              type: integer
+              example: 1000
+            currency:
+              type: string
+              example: INR
+            key_id:
+              type: string
+              example: rzp_test_mockKeyId
+
+    PaymentVerifiedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            coins_credited:
+              type: integer
+              example: 10
+            new_coin_balance:
+              type: integer
+              example: 55
+
+    TransactionsListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+              type:
+                type: string
+              coins_amount:
+                type: integer
+              currency_amount_paise:
+                type: integer
+              status:
+                type: string
+              created_at:
+                type: string
+
+    WithdrawalCreatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            withdrawal_id:
+              type: string
+            amount_paise:
+              type: integer
+            upi_id:
+              type: string
+            status:
+              type: string
+              example: PROCESSING
+
+    WithdrawalListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+              amount_paise:
+                type: integer
+              upi_id:
+                type: string
+              status:
+                type: string
+              created_at:
+                type: string
+
+    Gift:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 660c2830f3b9c45019a8e050
+        name:
+          type: string
+          example: Rose
+        slug:
+          type: string
+          example: rose-10c
+        coin_price:
+          type: integer
+          example: 10
+        icon_url:
+          type: string
+          example: https://res.cloudinary.com/donkey-play/image/upload/v1/gifts/rose.png
+        creator_earning_paise:
+          type: integer
+          example: 700
+
+    GiftListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Gift'
+
+    SendGiftResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            transfer_id:
+              type: string
+            remaining_coins:
+              type: integer
+              example: 45
+
+    ReportSubmittedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Report submitted. Mutual block applied for 24 hours.
+
+    BlockListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+              blocked_user:
+                $ref: '#/components/schemas/PublicUserResponse'
+              reason:
+                type: string
+              created_at:
+                type: string

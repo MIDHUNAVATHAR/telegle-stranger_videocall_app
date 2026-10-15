@@ -11,9 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@donkey-play/shared-types": "workspace:*",
+    "@donkey-play/validation": "workspace:*",
     "next": "15.3.9",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "socket.io-client": "^4.8.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

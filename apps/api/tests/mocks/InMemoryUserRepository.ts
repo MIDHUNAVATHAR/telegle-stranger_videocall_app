@@ -27,6 +27,15 @@ export class InMemoryUserRepository implements UserRepository {
     return null;
   }
 
+  public async findByGoogleId(googleId: string): Promise<User | null> {
+    for (const user of this.users.values()) {
+      if (user.googleId === googleId) {
+        return user;
+      }
+    }
+    return null;
+  }
+
   public async existsByEmail(email: string): Promise<boolean> {
     return (await this.findByEmail(email)) !== null;
   }

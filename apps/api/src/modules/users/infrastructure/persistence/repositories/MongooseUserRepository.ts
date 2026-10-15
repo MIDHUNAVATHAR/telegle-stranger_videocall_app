@@ -31,6 +31,14 @@ export class MongooseUserRepository implements UserRepository {
     return UserMapper.toDomain(doc);
   }
 
+  public async findByGoogleId(googleId: string): Promise<User | null> {
+    const doc = await this.model.findOne({ googleId }).exec();
+    if (!doc) {
+      return null;
+    }
+    return UserMapper.toDomain(doc);
+  }
+
   public async existsByEmail(email: string): Promise<boolean> {
     const count = await this.model.countDocuments({ email: email.toLowerCase() }).exec();
     return count > 0;

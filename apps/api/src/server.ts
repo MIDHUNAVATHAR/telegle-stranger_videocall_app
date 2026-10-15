@@ -1,22 +1,39 @@
+import http from 'http';
 import { app } from './app';
 import { env } from './config/env';
+import { logger } from './common/logger';
 import { connectDatabase, disconnectDatabase } from './config/database';
+import { connectRedis, disconnectRedis } from './config/redis';
+import { SocketServer } from './modules/matching/presentation/socket/SocketServer';
 
 const startServer = async () => {
   try {
     if (env.NODE_ENV !== 'test') {
       await connectDatabase();
+      await connectRedis();
     }
 
-    const server = app.listen(env.PORT, () => {
-      console.log(`[Donkey Play API] Server listening on http://localhost:${env.PORT} in ${env.NODE_ENV} mode`);
+    const httpServer = http.createServer(app);
+    const socketServer = new SocketServer(httpServer);
+
+    const server = httpServer.listen(env.PORT, () => {
+      logger.info(`[Donkey Play API] Server listening on http://localhost:${env.PORT} in ${env.NODE_ENV} mode`);
+      logger.info(`[Donkey Play API] Interactive documentation available at http://localhost:${env.PORT}/api/docs`);
     });
 
     const gracefulShutdown = async (signal: string) => {
-      console.log(`[Donkey Play API] Received ${signal}. Shutting down gracefully...`);
+      logger.info(`[Donkey Play API] Received ${signal}. Shutting down gracefully...`);
+      socketServer.close();
       server.close(async () => {
-        await disconnectDatabase();
-        process.exit(0);
+        try {
+          await disconnectRedis();
+          await disconnectDatabase();
+          logger.info('[Donkey Play API] All infrastructure disconnected cleanly. Exiting.');
+          process.exit(0);
+        } catch (err) {
+          logger.error('[Donkey Play API] Error during graceful shutdown:', err);
+          process.exit(1);
+        }
       });
     };
 
@@ -25,7 +42,7 @@ const startServer = async () => {
 
     return server;
   } catch (error) {
-    console.error('[Donkey Play API] Failed to start server:', error);
+    logger.error('[Donkey Play API] Fatal error starting server:', error);
     process.exit(1);
   }
 };

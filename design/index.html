@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Donkey Play — UI/UX Design Mockup Showcase</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; }
+    body { background: #070A0F; color: #F8FAFC; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* Top Header */
+    header {
+      height: 60px;
+      background: #0E131F;
+      border-bottom: 1px solid #1E283D;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      flex-shrink: 0;
+    }
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #FF3366, #FF6B8B);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .brand-title span { color: #FF3366; }
+    .header-badge {
+      font-size: 12px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* Main Layout */
+    .showcase-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Sidebar Navigation */
+    aside {
+      width: 340px;
+      background: #0B0F19;
+      border-right: 1px solid #1E283D;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-section-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #F59E0B;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 16px 20px 8px 20px;
+    }
+    .nav-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 12px 20px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .screen-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: #94A3B8;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .screen-btn:hover {
+      background: #141B2B;
+      color: #F8FAFC;
+    }
+    .screen-btn.active {
+      background: #1A2438;
+      color: #fff;
+      border-color: #FF3366;
+    }
+    .screen-btn .num-badge {
+      width: 24px;
+      height: 24px;
+      background: #172033;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #F8FAFC;
+    }
+    .screen-btn.active .num-badge {
+      background: #FF3366;
+    }
+
+    /* Main Viewer Area */
+    main {
+      flex: 1;
+      background: #06080D;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: auto;
+      padding: 24px;
+    }
+    .preview-container {
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .preview-img {
+      max-height: 82vh;
+      max-width: 90vw;
+      object-fit: contain;
+      border-radius: 20px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px #1E283D;
+    }
+    .preview-caption {
+      margin-top: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #94A3B8;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .open-raw-link {
+      color: #FF3366;
+      text-decoration: underline;
+      font-size: 13px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand-title">
+      <div class="brand-icon">🫏</div>
+      <div>Donkey<span>Play</span> · UI Mockup Showcase</div>
+    </div>
+    <div class="header-badge">✓ High-Fidelity Design Review</div>
+  </header>
+
+  <div class="showcase-layout">
+    <aside>
+      <div class="sidebar-section-title">Overview</div>
+      <div style="padding: 0 12px 8px 12px;">
+        <button class="screen-btn active" onclick="selectScreen('12-all-screens-contact-sheet.jpg', 'Master Contact Sheet — All Screens Side-by-Side')">
+          <div class="num-badge">★</div>
+          <div>12. All Screens Contact Sheet</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('11-desktop-presentation.png', 'Desktop Viewport Presentation (Centered 390–430px Mobile Column)')">
+          <div class="num-badge">🖥️</div>
+          <div>11. Desktop Browser Presentation</div>
+        </button>
+      </div>
+
+      <div class="sidebar-section-title">Phase 1: Onboarding & Discovery</div>
+      <div class="nav-list">
+        <button class="screen-btn" onclick="selectScreen('01-email-login.png', 'Screen 1A: Email Login & Google Sign-In')">
+          <div class="num-badge">01</div>
+          <div>01. Email Login</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('02-email-otp.png', 'Screen 1B: 6-Digit OTP Verification')">
+          <div class="num-badge">02</div>
+          <div>02. OTP Verification</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('03-home-idle.png', 'Screen 2A: Home / Start Matching Hero')">
+          <div class="num-badge">03</div>
+          <div>03. Home / Idle</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('04-matching-loading.png', 'Screen 2B (Part 1): Matching Radar In-Progress')">
+          <div class="num-badge">04</div>
+          <div>04. Matching Searching</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('05-matching-result.png', 'Screen 2B (Part 2): Confirmed Match Card (Elena, 24)')">
+          <div class="num-badge">05</div>
+          <div>05. Match Result</div>
+        </button>
+
+        <div class="sidebar-section-title" style="padding-left: 8px; margin-top: 10px;">Phase 2: Video Call, Wallet & Profile</div>
+        <button class="screen-btn" onclick="selectScreen('06-messages.png', 'Screen 3: Past Video Connections History')">
+          <div class="num-badge">06</div>
+          <div>06. Messages / Connections</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('09-video-call.png', 'Screen 6: Active 1-on-1 Video Call with Safe PiP Layout')">
+          <div class="num-badge">09</div>
+          <div>09. Active Video Call</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('10-gift-selection.png', 'Screen 6 Drawer: Virtual Gift Bottom Sheet')">
+          <div class="num-badge">10</div>
+          <div>10. Gift Selection Sheet</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('07-wallet.png', 'Screen 4: Coin Wallet & UPI Cash Payout')">
+          <div class="num-badge">07</div>
+          <div>07. Wallet & Earnings</div>
+        </button>
+        <button class="screen-btn" onclick="selectScreen('08-profile.png', 'Screen 5: User Profile, 100 Karma & Settings')">
+          <div class="num-badge">08</div>
+          <div>08. Profile & Settings</div>
+        </button>
+      </div>
+    </aside>
+
+    <main>
+      <div class="preview-container">
+        <img id="main-preview" class="preview-img" src="/mockups/12-all-screens-contact-sheet.jpg" alt="Preview">
+        <div class="preview-caption">
+          <span id="caption-text">Master Contact Sheet — All Screens Side-by-Side</span>
+          <span>•</span>
+          <a id="raw-link" class="open-raw-link" href="/mockups/12-all-screens-contact-sheet.jpg" target="_blank">Open Full-Resolution Image ↗</a>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function selectScreen(filename, caption) {
+      document.getElementById('main-preview').src = '/mockups/' + filename;
+      document.getElementById('raw-link').href = '/mockups/' + filename;
+      document.getElementById('caption-text').innerText = caption;
+
+      document.querySelectorAll('.screen-btn').forEach(btn => btn.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+    }
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../../../shared/components/Button';
 import { Badge } from '../../../shared/components/Badge';
 import {
@@ -11,11 +11,15 @@ import {
   IconGift,
   IconChat,
   IconBolt,
+  IconShield,
 } from '../../../shared/components/Icons';
 import { Stranger } from '../../../shared/types';
+import { useWebRTC } from '../hooks/useWebRTC';
 
 interface VideoCallViewProps {
   stranger: Stranger | null;
+  sessionId?: string;
+  isInitiator?: boolean;
   onNextStranger: () => void;
   onOpenGiftModal: () => void;
   onOpenReportModal: () => void;
@@ -25,15 +29,68 @@ interface VideoCallViewProps {
 
 export const VideoCallView: React.FC<VideoCallViewProps> = ({
   stranger,
+  sessionId = 'sess_demo_live',
+  isInitiator = true,
   onNextStranger,
   onOpenGiftModal,
   onOpenReportModal,
   onToggleChat,
   isChatOpen,
 }) => {
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [callDuration] = useState('01:42');
+  const [callDurationSeconds, setCallDurationSeconds] = useState(0);
+
+  const {
+    localStream,
+    remoteStream,
+    isMuted,
+    isVideoOff,
+    isBlurred,
+    lockCountdown,
+    toggleMute,
+    toggleVideo,
+    unblurRemote,
+    endCall,
+  } = useWebRTC({
+    sessionId,
+    isInitiator,
+    onCallEnded: onNextStranger,
+  });
+
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Attach local and remote streams to video elements
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  // Live call timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCallDurationSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatDuration = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleSkipToNext = async () => {
+    if (lockCountdown > 0) return;
+    await endCall(false);
+    onNextStranger();
+  };
 
   if (!stranger) {
     return (
@@ -92,15 +149,78 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
           justifyContent: 'center',
         }}
       >
-        <img
-          src={stranger.avatar}
-          alt={stranger.name}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
-        />
+        {remoteStream ? (
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: isBlurred ? 'blur(28px)' : 'none',
+              transition: 'filter 0.3s ease',
+            }}
+          />
+        ) : (
+          <img
+            src={stranger.avatar}
+            alt={stranger.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: isBlurred ? 'blur(28px)' : 'none',
+              transition: 'filter 0.3s ease',
+            }}
+          />
+        )}
+
+        {/* Auto-Blur Shield Overlay */}
+        {isBlurred && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              padding: '16px',
+              textAlign: 'center',
+              zIndex: 10,
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 90, 31, 0.2)',
+                color: 'var(--accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <IconShield size={28} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '15px', color: '#ffffff', display: 'block' }}>
+                Auto-Blur Shield Active
+              </strong>
+              <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.75)' }}>
+                Protected against surprise content · Respect Others
+              </span>
+            </div>
+            <Button variant="primary" size="sm" onClick={unblurRemote}>
+              Tap to Reveal Stream
+            </Button>
+          </div>
+        )}
 
         {/* Top Info Overlay */}
         <div
@@ -113,6 +233,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             pointerEvents: 'none',
+            zIndex: 15,
           }}
         >
           <div
@@ -164,7 +285,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
                 backgroundColor: 'var(--accent)',
               }}
             />
-            {callDuration} · HD
+            {formatDuration(callDurationSeconds)} · WebRTC P2P
           </div>
         </div>
 
@@ -184,12 +305,21 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             border: '2px solid rgba(255, 255, 255, 0.2)',
+            zIndex: 15,
           }}
         >
           {isVideoOff ? (
             <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
               Camera Off
             </span>
+          ) : localStream ? (
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           ) : (
             <img
               src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80"
@@ -224,6 +354,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             gap: '6px',
             flexWrap: 'wrap',
             maxWidth: '60%',
+            zIndex: 15,
           }}
         >
           {stranger.interests.map((i) => (
@@ -246,7 +377,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
         }}
       >
         <button
-          onClick={() => setIsMuted((m) => !m)}
+          onClick={toggleMute}
           aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
           style={{
             minHeight: '48px',
@@ -260,6 +391,8 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             color: isMuted ? 'var(--danger)' : 'var(--ink)',
             fontSize: 'var(--step-small)',
             fontWeight: 600,
+            cursor: 'pointer',
+            border: 'none',
           }}
         >
           {isMuted ? <IconMicOff size={18} /> : <IconMic size={18} />}
@@ -267,7 +400,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
         </button>
 
         <button
-          onClick={() => setIsVideoOff((v) => !v)}
+          onClick={toggleVideo}
           aria-label={isVideoOff ? 'Turn video on' : 'Turn video off'}
           style={{
             minHeight: '48px',
@@ -281,6 +414,8 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             color: isVideoOff ? 'var(--danger)' : 'var(--ink)',
             fontSize: 'var(--step-small)',
             fontWeight: 600,
+            cursor: 'pointer',
+            border: 'none',
           }}
         >
           {isVideoOff ? <IconVideoOff size={18} /> : <IconVideo size={18} />}
@@ -302,6 +437,8 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             color: 'var(--accent)',
             fontSize: 'var(--step-small)',
             fontWeight: 700,
+            cursor: 'pointer',
+            border: 'none',
           }}
         >
           <IconGift size={18} />
@@ -323,15 +460,19 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             color: isChatOpen ? 'var(--accent-ink)' : 'var(--ink)',
             fontSize: 'var(--step-small)',
             fontWeight: 600,
+            cursor: 'pointer',
+            border: 'none',
           }}
         >
           <IconChat size={18} />
           <span>Chat</span>
         </button>
 
+        {/* Next / Skip button with 5-Second Countdown Lock */}
         <button
-          onClick={onNextStranger}
-          aria-label="Skip to next stranger"
+          onClick={handleSkipToNext}
+          disabled={lockCountdown > 0}
+          aria-label={lockCountdown > 0 ? `Please wait ${lockCountdown} seconds` : 'Skip to next stranger'}
           style={{
             minHeight: '48px',
             display: 'flex',
@@ -340,14 +481,18 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             justifyContent: 'center',
             gap: '4px',
             borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--accent)',
-            color: 'var(--accent-ink)',
+            backgroundColor: lockCountdown > 0 ? 'var(--surface-raised)' : 'var(--accent)',
+            color: lockCountdown > 0 ? 'var(--ink-secondary)' : 'var(--accent-ink)',
             fontSize: 'var(--step-small)',
             fontWeight: 800,
+            cursor: lockCountdown > 0 ? 'not-allowed' : 'pointer',
+            border: 'none',
+            opacity: lockCountdown > 0 ? 0.65 : 1,
+            transition: 'all 0.2s ease',
           }}
         >
           <IconBolt size={18} />
-          <span>Next</span>
+          <span>{lockCountdown > 0 ? `${lockCountdown}s` : 'Next'}</span>
         </button>
       </div>
 
@@ -370,6 +515,9 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             color: 'var(--danger)',
             fontWeight: 600,
             padding: '6px 12px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
           }}
         >
           Report or Block

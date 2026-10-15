@@ -12,6 +12,9 @@ import { ProfileView } from '../features/profile/components/ProfileView';
 import { GiftModal } from '../features/gifts/components/GiftModal';
 import { SettingsModal } from '../features/settings/components/SettingsModal';
 import { ReportModal } from '../features/matching/components/ReportModal';
+import { AuthProvider, useAuth, AuthModal } from '../features/auth';
+import { walletApi } from '../features/wallet/walletApi';
+import { useEffect } from 'react';
 import {
   IconBolt,
   IconSettings,
@@ -22,9 +25,23 @@ import {
   IconUser,
 } from '../shared/components/Icons';
 
-export function App() {
+function AppContent() {
+  const { user: authUser, isAuthenticated, isAuthModalOpen, openAuthModal, closeAuthModal, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('matching');
   const [user, setUser] = useState(INITIAL_USER);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      walletApi
+        .getBalance()
+        .then((bal) => {
+          if (bal) {
+            setUser((prev) => ({ ...prev, coins: bal.purchasedCoinsBalance }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAuthenticated]);
   const [activeStranger, setActiveStranger] = useState<Stranger | null>(SAMPLE_STRANGERS[0]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -102,40 +119,39 @@ export function App() {
 
   const handleSendGift = (gift: VirtualGift) => {
     if (user.coins >= gift.cost) {
-      setUser((prev) => ({ ...prev, coins: prev.coins - gift.cost }));
+      setUser((prev) => ({
+        ...prev,
+        coins: prev.coins - gift.cost,
+      }));
       setMessages((prev) => [
         ...prev,
         {
           id: `gift_${Date.now()}`,
           senderId: user.id,
-          text: `Sent a virtual gift: ${gift.name}!`,
+          text: `Sent a ${gift.name} ${gift.icon}!`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isSelf: true,
         },
       ]);
+      setIsGiftOpen(false);
     }
   };
 
-  const handleAddCoins = (amount: number) => {
-    setUser((prev) => ({ ...prev, coins: prev.coins + amount }));
-  };
-
-  const handleUpdateBio = (newBio: string) => {
-    setUser((prev) => ({ ...prev, bio: newBio }));
-  };
-
-  const handleConfirmReport = (reason: string) => {
-    setActiveStranger(null);
-    setActiveTab('matching');
-    alert(`Stranger reported for: "${reason}". Session terminated.`);
+  const handleConfirmReport = () => {
+    setIsReportOpen(false);
+    handleNextStranger();
   };
 
   return (
     <div
       style={{
+        width: '100%',
+        maxWidth: '480px',
+        margin: '0 auto',
+        minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100dvh',
+        position: 'relative',
         backgroundColor: 'var(--bg)',
         color: 'var(--ink)',
       }}
@@ -151,6 +167,7 @@ export function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          borderBottom: '1px solid #1e2230',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -190,35 +207,75 @@ export function App() {
 
         {/* Header Right Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={() => setActiveTab('wallet')}
-            aria-label="View coins balance"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--surface-raised)',
-              color: 'var(--accent)',
-              fontSize: '13px',
-              fontWeight: 700,
-            }}
-          >
-            <IconBolt size={16} />
-            <span>{user.coins}</span>
-          </button>
+          {isAuthenticated ? (
+            <>
+              <button
+                onClick={() => setActiveTab('wallet')}
+                aria-label="View coins balance"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'var(--surface-raised)',
+                  color: 'var(--accent)',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                }}
+              >
+                <IconBolt size={16} />
+                <span>{user.coins}</span>
+              </button>
+
+              <button
+                onClick={logout}
+                title={`Signed in as ${authUser?.display_name || authUser?.email}. Click to Logout`}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: '#1e2230',
+                  color: '#9ea4b4',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: '1px solid #262c3e',
+                  cursor: 'pointer',
+                }}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={openAuthModal}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'var(--accent)',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Sign In
+            </button>
+          )}
 
           <button
             onClick={() => setIsSettingsOpen(true)}
             aria-label="Open settings"
             style={{
-              width: '44px',
-              height: '44px',
+              width: '40px',
+              height: '40px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 'var(--radius-sm)',
+              borderRadius: 'var(--radius-full)',
               backgroundColor: 'var(--surface-raised)',
               color: 'var(--ink-secondary)',
             }}
@@ -228,40 +285,25 @@ export function App() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main
-        style={{
-          flex: 1,
-          width: '100%',
-          maxWidth: '640px',
-          margin: '0 auto',
-          padding: 'var(--space-16) var(--space-16) 96px var(--space-16)',
-        }}
-      >
+      {/* Main Tab Area */}
+      <main style={{ flex: 1, paddingBottom: '76px', display: 'flex', flexDirection: 'column' }}>
         {activeTab === 'matching' && (
-          <MatchingView onMatchFound={handleMatchFound} />
+          <MatchingView
+            onMatchFound={handleMatchFound}
+            userCoins={user.coins}
+            onOpenWallet={() => setActiveTab('wallet')}
+          />
         )}
 
-        {activeTab === 'video-call' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>
-            <VideoCallView
-              stranger={activeStranger}
-              onNextStranger={handleNextStranger}
-              onOpenGiftModal={() => setIsGiftOpen(true)}
-              onOpenReportModal={() => setIsReportOpen(true)}
-              onToggleChat={() => setIsChatOpen(!isChatOpen)}
-              isChatOpen={isChatOpen}
-            />
-
-            {isChatOpen && (
-              <ChatView
-                stranger={activeStranger}
-                messages={messages}
-                onSendMessage={handleSendMessage}
-                onReact={handleReact}
-              />
-            )}
-          </div>
+        {activeTab === 'video-call' && activeStranger && (
+          <VideoCallView
+            stranger={activeStranger}
+            isChatOpen={isChatOpen}
+            onToggleChat={() => setIsChatOpen(!isChatOpen)}
+            onNextStranger={handleNextStranger}
+            onOpenGiftModal={() => setIsGiftOpen(true)}
+            onOpenReportModal={() => setIsReportOpen(true)}
+          />
         )}
 
         {activeTab === 'chat' && (
@@ -270,36 +312,55 @@ export function App() {
             messages={messages}
             onSendMessage={handleSendMessage}
             onReact={handleReact}
+            onDirectCall={handleMatchFound}
           />
         )}
 
         {activeTab === 'wallet' && (
-          <WalletView coins={user.coins} onAddCoins={handleAddCoins} />
+          <WalletView
+            coins={user.coins}
+            onAddCoins={(amount: number) => {
+              setUser((prev) => ({
+                ...prev,
+                coins: prev.coins + amount,
+              }));
+            }}
+          />
         )}
 
         {activeTab === 'profile' && (
           <ProfileView
-            user={user}
-            onUpdateBio={handleUpdateBio}
+            user={{
+              ...user,
+              name: authUser?.display_name || user.name,
+            }}
+            onUpdateBio={(newBio: string) => {
+              setUser((prev) => ({
+                ...prev,
+                bio: newBio,
+              }));
+            }}
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
         )}
       </main>
 
-      {/* Bottom Mobile-First Navigation Bar */}
+      {/* Mobile Bottom Navigation Bar */}
       <nav
-        aria-label="Main Navigation"
+        aria-label="Bottom primary navigation"
         style={{
           position: 'fixed',
           bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 100,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '100%',
+          maxWidth: '480px',
           backgroundColor: 'var(--surface)',
+          borderTop: '1px solid #1e2230',
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',
-          padding: '6px 8px 12px 8px',
-          borderTop: 'none',
+          padding: '6px 8px',
+          zIndex: 100,
         }}
       >
         <button
@@ -319,7 +380,7 @@ export function App() {
           }}
         >
           <IconCompass size={18} />
-          <span>Discover</span>
+          <span>Match</span>
         </button>
 
         <button
@@ -339,7 +400,7 @@ export function App() {
           }}
         >
           <IconVideo size={18} />
-          <span>Live Call</span>
+          <span>Call</span>
         </button>
 
         <button
@@ -359,7 +420,7 @@ export function App() {
           }}
         >
           <IconChat size={18} />
-          <span>Chat</span>
+          <span>Messages</span>
         </button>
 
         <button
@@ -404,10 +465,16 @@ export function App() {
       </nav>
 
       {/* Global Modals */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+      />
+
       <GiftModal
         isOpen={isGiftOpen}
         onClose={() => setIsGiftOpen(false)}
         coins={user.coins}
+        recipientUserId={activeStranger?.id}
         onSendGift={handleSendGift}
       />
 
@@ -421,10 +488,19 @@ export function App() {
           isOpen={isReportOpen}
           onClose={() => setIsReportOpen(false)}
           strangerName={activeStranger.name}
+          targetUserId={activeStranger.id}
           onConfirmReport={handleConfirmReport}
         />
       )}
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

@@ -1,0 +1,61 @@
+sequenceDiagram
+    autonumber
+    actor Alice as Alice (Caller / Offer)
+    actor Bob as Bob (Receiver / Answer)
+    participant WS as Socket.IO Server (/signaling)
+    participant STUN as Google STUN Server
+    participant DB as MongoDB
+    participant Redis as Redis
+
+    %% Phase 1: WebRTC Signaling
+    note over Alice, Bob: 1. WebRTC Signaling via Socket.IO
+    Alice->>STUN: Query Public IP & Port (ICE Candidates)
+    STUN-->>Alice: STUN Server Reflexive Candidate
+    Bob->>STUN: Query Public IP & Port (ICE Candidates)
+    STUN-->>Bob: STUN Server Reflexive Candidate
+
+    Alice->>WS: webrtc_offer { sessionId, sdpOffer }
+    WS-->>Bob: webrtc_offer { sessionId, sdpOffer }
+    Bob->>WS: webrtc_answer { sessionId, sdpAnswer }
+    WS-->>Alice: webrtc_answer { sessionId, sdpAnswer }
+
+    Alice->>WS: ice_candidate { sessionId, candidate }
+    WS-->>Bob: ice_candidate { sessionId, candidate }
+    Bob->>WS: ice_candidate { sessionId, candidate }
+    WS-->>Alice: ice_candidate { sessionId, candidate }
+
+    %% Phase 2: Direct Media Stream
+    note over Alice, Bob: 2. Direct P2P DTLS-SRTP Media Stream Established
+    Alice<<-->>Bob: P2P Audio / Video Stream (STUN NAT Hole Punch)
+
+    %% Phase 3: 5-Second Minimum Rule
+    note over Alice, WS: 3. Server-Enforced 5-Second Minimum Duration
+    WS->>Redis: SETEX call:timer:sessionId 5 "LOCKED"
+    WS-->>Alice: call_started { minDurationSec: 5, startedAt: timestamp }
+    WS-->>Bob: call_started { minDurationSec: 5, startedAt: timestamp }
+    Alice->>Alice: UI Leave Button disabled with 5s countdown
+    alt Alice clicks Leave before 5 seconds
+        Alice->>WS: leave_call { sessionId }
+        WS-->>Alice: error { code: "MIN_DURATION_NOT_MET", remainingSec: 3 }
+    end
+
+    %% Phase 4: In-Call Ephemeral Chat & Gifts
+    note over Alice, Bob: 4. Ephemeral In-Call Chat & Gift Sending
+    Alice->>WS: in_call_message { sessionId, text: "Hey there! Nice to meet you." }
+    WS-->>Bob: in_call_message { sender: "Alice", text: "Hey there! Nice to meet you." }
+    note over WS, DB: Ephemeral message is NOT saved to MongoDB messages table
+
+    Alice->>WS: send_gift { sessionId, giftId: "rose-10c", recipientId: "userB" }
+    WS->>DB: Atomically deduct 10 coins from Alice, credit 70% (₹7.00 / 700 paise) to Bob's wallet
+    WS-->>Alice: gift_sent { giftId: "rose-10c", remainingCoins: 40 }
+    WS-->>Bob: gift_received { giftId: "rose-10c", senderName: "Alice", earnedPaise: 700 }
+    Bob->>Bob: Trigger onscreen 3D/Lottie Rose animation
+
+    %% Phase 5: Normal Disconnect & Inbox Creation
+    note over Alice, DB: 5. Call Teardown & Conversation Record Updation
+    Note over Alice: > 5 seconds elapsed
+    Alice->>WS: leave_call { sessionId }
+    WS-->>Bob: peer_left { sessionId, reason: "NORMAL_EXIT" }
+    WS->>DB: UPDATE Matches SET status="COMPLETED", duration_seconds=42, ended_at=now
+    WS->>DB: UPSERT Conversations { participant_ids: ["userA", "userB"], last_interaction_at: now, last_call_match_id: matchId }
+    note over DB: Both users now see each other in their persistent Messages inbox list!

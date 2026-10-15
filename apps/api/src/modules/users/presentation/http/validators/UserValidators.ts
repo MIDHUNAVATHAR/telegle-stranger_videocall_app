@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { displayNameSchema, ageSchema, genderSchema } from '@donkey-play/validation';
 
 export const createUserSchema = {
   body: z.object({
@@ -18,5 +19,23 @@ export const createUserSchema = {
 export const getUserByIdSchema = {
   params: z.object({
     id: z.string().min(1, 'User ID is required'),
+  }),
+};
+
+export const updateProfileSchema = {
+  body: z.object({
+    display_name: displayNameSchema.optional(),
+    bio: z.string().trim().max(200, 'Bio cannot exceed 200 characters').optional(),
+    gender: genderSchema.optional(),
+    age: ageSchema.optional(),
+    avatar_url: z.string().trim().url().optional().or(z.literal('')),
+  }),
+};
+
+export const updatePreferencesSchema = {
+  body: z.object({
+    preferred_gender: z.enum(['ANY', 'MALE', 'FEMALE']).optional(),
+    allow_incoming_calls: z.boolean().optional(),
+    sound_enabled: z.boolean().optional(),
   }),
 };

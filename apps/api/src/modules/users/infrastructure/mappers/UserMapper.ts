@@ -1,4 +1,4 @@
-import { User } from '../../domain/entities/User';
+import { User, UserGender, UserRole } from '../../domain/entities/User';
 import { UserDocument } from '../persistence/mongoose/UserModel';
 
 export class UserMapper {
@@ -6,10 +6,20 @@ export class UserMapper {
     return User.reconstitute({
       id: doc.userId,
       username: doc.username,
+      displayName: doc.displayName || doc.username,
       email: doc.email,
-      bio: doc.bio,
-      karmaScore: doc.karmaScore,
-      isActive: doc.isActive,
+      googleId: doc.googleId,
+      age: doc.age || 18,
+      gender: (doc.gender as UserGender) || 'PREFER_NOT_TO_SAY',
+      avatarUrl: doc.avatarUrl || '',
+      bio: doc.bio || '',
+      role: (doc.role as UserRole) || 'USER',
+      isBanned: doc.isBanned || false,
+      bannedUntil: doc.bannedUntil,
+      karmaScore: doc.karmaScore ?? 100,
+      isActive: doc.isActive !== false,
+      tokenVersion: doc.tokenVersion || 1,
+      lastLoginAt: doc.lastLoginAt || doc.createdAt || new Date(),
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     });
@@ -18,18 +28,38 @@ export class UserMapper {
   public static toPersistence(user: User): {
     userId: string;
     username: string;
+    displayName: string;
     email: string;
-    bio?: string;
+    googleId?: string;
+    age: number;
+    gender: string;
+    avatarUrl: string;
+    bio: string;
+    role: string;
+    isBanned: boolean;
+    bannedUntil?: Date | null;
     karmaScore: number;
     isActive: boolean;
+    tokenVersion: number;
+    lastLoginAt: Date;
   } {
     return {
       userId: user.id,
       username: user.username,
+      displayName: user.displayName,
       email: user.email,
-      bio: user.bio,
+      googleId: user.googleId,
+      age: user.age,
+      gender: user.gender,
+      avatarUrl: user.avatarUrl || '',
+      bio: user.bio || '',
+      role: user.role,
+      isBanned: user.isBanned,
+      bannedUntil: user.bannedUntil,
       karmaScore: user.karmaScore,
       isActive: user.isActive,
+      tokenVersion: user.tokenVersion,
+      lastLoginAt: user.lastLoginAt,
     };
   }
 }

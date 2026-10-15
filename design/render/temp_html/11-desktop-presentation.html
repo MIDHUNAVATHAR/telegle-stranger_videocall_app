@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      background: #05070B;
+      width: 1440px;
+      height: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .ambient-glow {
+      position: absolute;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(255, 90, 31, 0.12) 0%, rgba(245, 158, 11, 0.05) 50%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    /* Desktop Browser Shell */
+    .browser-window {
+      width: 1280px;
+      height: 800px;
+      background: #090D15;
+      border: 1px solid #1E293B;
+      border-radius: 18px;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 10;
+    }
+    .browser-top-bar {
+      height: 44px;
+      background: #0F141F;
+      border-bottom: 1px solid #1E293B;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+    }
+    .window-dots {
+      display: flex;
+      gap: 7px;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #EF4444; }
+    .dot.yellow { background: #F59E0B; }
+    .dot.green { background: #10B981; }
+    
+    .url-bar {
+      flex: 1;
+      max-width: 460px;
+      height: 28px;
+      background: #172033;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 12px;
+      color: #94A3B8;
+      gap: 6px;
+      margin: 0 auto;
+    }
+    /* Centered Mobile App Frame inside Desktop */
+    .browser-viewport {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0A0E18;
+      position: relative;
+    }
+    .mobile-app-shell {
+      width: 390px;
+      height: 720px;
+      background: #080B12;
+      border: 2px solid #202B3F;
+      border-radius: 36px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    /* Annotations */
+    .annotation-card {
+      position: absolute;
+      background: rgba(16, 22, 36, 0.92);
+      border: 1px solid #2D3D5A;
+      border-radius: 14px;
+      padding: 16px;
+      width: 270px;
+      color: #F8FAFC;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .annotation-card.left { left: 80px; top: 220px; }
+    .annotation-card.right { right: 80px; top: 220px; }
+    .ann-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #FF5A1F;
+      margin-bottom: 6px;
+    }
+    .ann-body {
+      font-size: 12px;
+      line-height: 1.45;
+      color: #94A3B8;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+
+  <div class="browser-window">
+    <div class="browser-top-bar">
+      <div class="window-dots">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <div class="url-bar">
+        <span>🔒</span>
+        <span style="color: #F8FAFC; font-weight: 600;">donkeyplay.com</span>
+        <span>/app</span>
+      </div>
+      <div style="font-size: 12px; color: #64748B;">Donkey Play Web</div>
+    </div>
+
+    <div class="browser-viewport">
+      <!-- Left Callout -->
+      <div class="annotation-card left">
+        <div class="ann-title">📱 Mobile-First Containment</div>
+        <div class="ann-body">On desktop screens, Donkey Play stays focused in a centered 390–430px smartphone column to preserve the intimate 1-on-1 feel and touch-friendly controls.</div>
+      </div>
+
+      <!-- Centered Mobile Container -->
+      <div class="mobile-app-shell">
+        <div style="height: 38px; padding: 10px 18px; display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #fff;">
+          <span>9:41</span>
+          <span>5G ●●</span>
+        </div>
+        <div style="padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1E293B;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 26px; height: 26px; background: #FF5A1F; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px;">🫏</div>
+            <strong style="color: #fff; font-size: 16px;">Donkey<span style="color:#FF5A1F;">Play</span></strong>
+          </div>
+          <div style="background: #101624; border: 1px solid #202B3F; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #F59E0B;">🪙 120</div>
+        </div>
+
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+          <div style="background: #101624; border: 1px solid #202B3F; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #34D399; margin-bottom: 24px;">
+            ● 1,480 People Online
+          </div>
+
+          <div style="width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, #FF5A1F, #FF7E40); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; box-shadow: 0 14px 34px rgba(255, 90, 31, 0.45); border: 2px solid rgba(255,255,255,0.3); margin-bottom: 20px;">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polygon points="23 7 16 12 23 7 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            <span style="font-size: 13px; font-weight: 800; margin-top: 4px;">START</span>
+          </div>
+
+          <h3 style="font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 4px;">Start Matching</h3>
+          <p style="font-size: 13px; color: #94A3B8; max-width: 250px; line-height: 1.4;">Strictly no nudity · Respect others and discover real connections worldwide.</p>
+        </div>
+
+        <div style="height: 64px; background: #0A0F1A; border-top: 1px solid #202B3F; display: flex; justify-content: space-around; align-items: center; font-size: 11px; color: #64748B;">
+          <span style="color: #FF5A1F; font-weight: 700;">Home</span>
+          <span>Messages</span>
+          <span>Wallet</span>
+          <span>Profile</span>
+        </div>
+      </div>
+
+      <!-- Right Callout -->
+      <div class="annotation-card right">
+        <div class="ann-title">🛡️ Respectful Social Platform</div>
+        <div class="ann-body">Zero generic SaaS clutter. Clean dark surfaces, warm energetic tangerine accents, strict anti-nudity community standards, and proactive reporting to avoid regulatory issues.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

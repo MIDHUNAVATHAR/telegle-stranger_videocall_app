@@ -1,0 +1,78 @@
+flowchart TB
+    subgraph Clients["Frontend Clients (Next.js 15 + React 19)"]
+        WebClient["Mobile-First Web App\n(Next.js App Router)"]
+        SocketClient["Socket.IO Client\n(Realtime Signaling & Presence)"]
+        WebRTCClient["WebRTC P2P Peer\n(Media Stream Audio/Video)"]
+    end
+
+    subgraph CDN_Cloud["External Cloud Infrastructure"]
+        Cloudinary["Cloudinary CDN\n(Avatar Uploads & Transformations)"]
+        Brevo["Brevo API\n(Transactional Email OTP Delivery)"]
+        Razorpay["Razorpay Gateway\n(INR Orders & Webhook Notifications)"]
+        RazorpayX["RazorpayX Payouts\n(Automated UPI Disbursals)"]
+        GoogleOAuth["Google Identity Services\n(OAuth 2.0 Token Verification)"]
+        GoogleSTUN["Public Google STUN Servers\n(stun:stun.l.google.com:19302)"]
+    end
+
+    subgraph BackendMonolith["Donkey Play API Monolith (Node.js + Express + TypeScript)"]
+        API_GW["Express HTTP Gateway\n(CORS, Helmet, RateLimiter, BodyParser)"]
+        SocketServer["Socket.IO Server\n(Namespaces: /signaling, /presence, /matchmaking)"]
+
+        subgraph Modules["Hexagonal Domain Modules"]
+            AuthMod["auth Module\n(OTP, Google, JWT, Sessions)"]
+            UserMod["users Module\n(Profiles, Settings, Moderation Status)"]
+            MatchMod["matching Module\n(Queue Management, Filters, Reservation)"]
+            CallMod["call Module\n(Signaling Relay, 5s Timer, Ephemeral Chat)"]
+            ChatMod["conversations Module\n(History, Soft-Delete, Direct Call Triggers)"]
+            WalletMod["wallet Module\n(Razorpay Verification, Coin Ledger, UPI Payouts)"]
+            GiftMod["gifts Module\n(Catalog, In-Call Gift Transfer, Revenue Split)"]
+            ModMod["moderation Module\n(Reports, Rolling Ban Counter, Mutual Block)"]
+        end
+
+        subgraph CoreInfra["Cross-Cutting & Infrastructure Layer"]
+            RepoLayer["Repository Pattern & Mongoose Models"]
+            RedisClient["Redis Service Client (ioredis)"]
+            EventBus["Internal Domain Events / EventEmitter"]
+            ZodValid["Zod Validation Middleware"]
+        end
+    end
+
+    subgraph Persistence["Storage & Cache Tier"]
+        MongoDB[("MongoDB 7.0+\n(Persistent Documents & Financial Ledger)")]
+        RedisCluster[("Redis 7.2+\n(Presence, Queues, Lua Scripts, TTL Rate Limits)")]
+    end
+
+    %% Client to Backend
+    WebClient -->|"HTTPS REST (JSON / Cookies)"| API_GW
+    SocketClient -->|"WSS (WebSocket Transport)"| SocketServer
+    WebRTCClient -.->|"P2P UDP / DTLS-SRTP (Audio & Video)"| WebRTCClient
+    WebRTCClient -->|"STUN NAT Discovery"| GoogleSTUN
+
+    %% API Gateway to Modules
+    API_GW --> ZodValid
+    ZodValid --> AuthMod
+    ZodValid --> UserMod
+    ZodValid --> MatchMod
+    ZodValid --> ChatMod
+    ZodValid --> WalletMod
+    ZodValid --> GiftMod
+    ZodValid --> ModMod
+
+    %% Socket.IO to Modules
+    SocketServer --> MatchMod
+    SocketServer --> CallMod
+    SocketServer --> ModMod
+
+    %% Modules to Infrastructure
+    AuthMod --> Brevo
+    AuthMod --> GoogleOAuth
+    UserMod --> Cloudinary
+    WalletMod --> Razorpay
+    WalletMod --> RazorpayX
+    Razorpay -->|"Signed Webhooks (HMAC-SHA256)"| API_GW
+
+    AuthMod & UserMod & MatchMod & ChatMod & WalletMod & GiftMod & ModMod --> RepoLayer
+    AuthMod & MatchMod & CallMod & WalletMod & ModMod --> RedisClient
+
+    RepoLayer --> MongoDB
+    RedisClient --> RedisCluster

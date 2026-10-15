@@ -1,31 +1,47 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/AppError';
+import { logger } from '../logger';
 
 export const errorHandler = (
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      logger.error(`Operational Server Error: ${err.message}`, err, {
+        path: req.path,
+        method: req.method,
+        code: err.code,
+      });
+    }
+
     res.status(err.statusCode).json({
       success: false,
       error: {
+        code: err.code,
         name: err.name,
         message: err.message,
-        details: err.details,
+        details: err.details ?? [],
       },
     });
     return;
   }
 
-  console.error('[Unhandled Error]', err);
+  // Unhandled / system errors
+  logger.error(`Unhandled Exception: ${err.message}`, err, {
+    path: req.path,
+    method: req.method,
+  });
 
   res.status(500).json({
     success: false,
     error: {
+      code: 'INTERNAL_SERVER_ERROR',
       name: 'InternalServerError',
-      message: 'An unexpected internal error occurred',
+      message: 'An unexpected internal error occurred. Please try again later.',
+      details: [],
     },
   });
 };

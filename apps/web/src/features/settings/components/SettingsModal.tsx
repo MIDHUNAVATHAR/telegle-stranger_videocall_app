@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
-import { IconLock } from '../../../shared/components/Icons';
+import { IconLock, IconShield } from '../../../shared/components/Icons';
+import { profileApi } from '../../profile/apis/profileApi';
+import { useAuth } from '../../auth';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -11,14 +13,83 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+  const { logout, isAuthenticated } = useAuth();
   const [blurPreview, setBlurPreview] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [allowIncomingCalls, setAllowIncomingCalls] = useState(true);
   const [hdVideo, setHdVideo] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && isAuthenticated) {
+      profileApi
+        .getMyProfile()
+        .then((data) => {
+          if (data?.preferences) {
+            setSoundEnabled(data.preferences.soundEnabled ?? true);
+            setAllowIncomingCalls(data.preferences.allowIncomingCalls ?? true);
+          }
+        })
+        .catch(() => {
+          // Keep defaults
+        });
+    }
+  }, [isOpen, isAuthenticated]);
+
+  const handleSaveAndClose = async () => {
+    setIsSaving(true);
+    try {
+      if (isAuthenticated) {
+        await profileApi.updatePreferences({
+          sound_enabled: soundEnabled,
+          allow_incoming_calls: allowIncomingCalls,
+        });
+      }
+    } catch {
+      // Graceful fallback
+    } finally {
+      setIsSaving(false);
+      onClose();
+    }
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Settings & Safety">
       <div data-ui style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)' }}>
-        {/* Safety Section */}
+        {/* Community Safety & Legal Notice */}
+        <div
+          style={{
+            backgroundColor: '#1f1510',
+            border: '1px solid #FF5A1F',
+            borderRadius: 'var(--radius-md)',
+            padding: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)' }}>
+            <IconShield size={20} />
+            <strong style={{ fontSize: 'var(--step-small)', textTransform: 'uppercase' }}>
+              Safety & Community Standards
+            </strong>
+          </div>
+          <ul
+            style={{
+              margin: '4px 0 0 16px',
+              padding: 0,
+              fontSize: '12px',
+              color: 'var(--ink-secondary)',
+              lineHeight: 1.5,
+            }}
+          >
+            <li><strong>Strictly No Nudity:</strong> Zero tolerance for sexually explicit content or lewd behavior.</li>
+            <li><strong>Respect Others:</strong> Harassment, hate speech, bullying, and recording peers is strictly forbidden.</li>
+            <li><strong>18+ Adults Only:</strong> Community is restricted to adults aged 18 and older.</li>
+          </ul>
+        </div>
+
+        {/* Safety & Privacy Section */}
         <div>
           <h3
             style={{
@@ -28,7 +99,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               marginBottom: '8px',
             }}
           >
-            Safety & Moderation
+            Safety & Privacy
           </h3>
           <div
             style={{
@@ -43,10 +114,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <strong style={{ fontSize: 'var(--step-body)', display: 'block' }}>
-                  Auto-Blur Strangers
+                  Auto-Blur Incoming Feeds
                 </strong>
                 <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-                  Blurs incoming camera feed until you tap to reveal
+                  Protects you by blurring video until you tap to reveal
                 </span>
               </div>
               <button
@@ -58,6 +129,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   borderRadius: 'var(--radius-full)',
                   backgroundColor: blurPreview ? 'var(--accent)' : 'var(--surface)',
                   position: 'relative',
+                  border: 'none',
+                  cursor: 'pointer',
                   transition: 'background-color var(--t-quick) ease',
                 }}
               >
@@ -69,7 +142,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     width: '22px',
                     height: '22px',
                     borderRadius: '50%',
-                    backgroundColor: blurPreview ? 'var(--accent-ink)' : 'var(--ink-secondary)',
+                    backgroundColor: blurPreview ? '#fff' : 'var(--ink-secondary)',
+                    transition: 'left var(--t-quick) ease',
+                  }}
+                />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <strong style={{ fontSize: 'var(--step-body)', display: 'block' }}>
+                  Allow Direct Incoming Calls
+                </strong>
+                <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
+                  Allow matched connections to call you from messages inbox
+                </span>
+              </div>
+              <button
+                onClick={() => setAllowIncomingCalls(!allowIncomingCalls)}
+                aria-label="Toggle direct incoming calls"
+                style={{
+                  width: '48px',
+                  height: '28px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: allowIncomingCalls ? 'var(--accent)' : 'var(--surface)',
+                  position: 'relative',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color var(--t-quick) ease',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '3px',
+                    left: allowIncomingCalls ? '23px' : '3px',
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    backgroundColor: allowIncomingCalls ? '#fff' : 'var(--ink-secondary)',
                     transition: 'left var(--t-quick) ease',
                   }}
                 />
@@ -90,7 +201,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         </div>
 
-        {/* Media Section */}
+        {/* Media & Audio Section */}
         <div>
           <h3
             style={{
@@ -118,7 +229,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   HD 1080p Video Call
                 </strong>
                 <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-                  Enable highest fidelity streaming
+                  WebRTC P2P direct streaming
                 </span>
               </div>
               <button
@@ -130,6 +241,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   borderRadius: 'var(--radius-full)',
                   backgroundColor: hdVideo ? 'var(--accent)' : 'var(--surface)',
                   position: 'relative',
+                  border: 'none',
+                  cursor: 'pointer',
                   transition: 'background-color var(--t-quick) ease',
                 }}
               >
@@ -141,7 +254,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     width: '22px',
                     height: '22px',
                     borderRadius: '50%',
-                    backgroundColor: hdVideo ? 'var(--accent-ink)' : 'var(--ink-secondary)',
+                    backgroundColor: hdVideo ? '#fff' : 'var(--ink-secondary)',
                     transition: 'left var(--t-quick) ease',
                   }}
                 />
@@ -154,7 +267,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   Sound Effects
                 </strong>
                 <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
-                  Connect chimes & gift audio
+                  Connect chimes & gift animations
                 </span>
               </div>
               <button
@@ -166,6 +279,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   borderRadius: 'var(--radius-full)',
                   backgroundColor: soundEnabled ? 'var(--accent)' : 'var(--surface)',
                   position: 'relative',
+                  border: 'none',
+                  cursor: 'pointer',
                   transition: 'background-color var(--t-quick) ease',
                 }}
               >
@@ -177,7 +292,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     width: '22px',
                     height: '22px',
                     borderRadius: '50%',
-                    backgroundColor: soundEnabled ? 'var(--accent-ink)' : 'var(--ink-secondary)',
+                    backgroundColor: soundEnabled ? '#fff' : 'var(--ink-secondary)',
                     transition: 'left var(--t-quick) ease',
                   }}
                 />
@@ -186,8 +301,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         </div>
 
-        <Button variant="secondary" size="md" fullWidth onClick={onClose}>
-          Save & Close
+        {isAuthenticated && (
+          <Button
+            variant="danger"
+            size="md"
+            fullWidth
+            onClick={() => {
+              logout();
+              onClose();
+            }}
+          >
+            Sign Out of Donkey Play
+          </Button>
+        )}
+
+        <Button variant="primary" size="md" fullWidth onClick={handleSaveAndClose} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Save & Close'}
         </Button>
       </div>
     </Modal>
