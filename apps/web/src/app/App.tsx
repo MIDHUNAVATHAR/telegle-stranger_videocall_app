@@ -294,7 +294,7 @@ function AppContent() {
       <main
         style={{
           flex: 1,
-          paddingBottom: isLiveCallActive ? 0 : '76px',
+          paddingBottom: isLiveCallActive ? 0 : activeTab === 'chat' ? '68px' : '76px',
           display: 'flex',
           flexDirection: 'column',
         }}

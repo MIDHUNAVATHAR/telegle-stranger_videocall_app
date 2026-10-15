@@ -127,7 +127,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        width: '100%',
+        flex: 1,
+        minHeight: 'calc(100dvh - 142px)',
+        padding: '8px 12px 0 12px',
+        boxSizing: 'border-box',
+      }}
+    >
       {/* View Switcher: In-Call Chat vs Messages Inbox */}
       <div
         style={{
@@ -137,6 +148,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           backgroundColor: 'var(--surface)',
           padding: '4px',
           borderRadius: 'var(--radius-md)',
+          flexShrink: 0,
         }}
       >
         <button
@@ -181,13 +193,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
           style={{
             display: 'flex',
             flexDirection: 'column',
-            minHeight: '420px',
+            flex: 1,
             backgroundColor: 'var(--surface)',
             padding: '16px',
             gap: '12px',
+            overflow: 'hidden',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <h3 style={{ fontSize: '15px', fontWeight: 700 }}>Previous Video Connections</h3>
             <span style={{ fontSize: '12px', color: 'var(--ink-secondary)' }}>
               Met in Video Roulette
@@ -208,6 +221,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 padding: '48px 16px',
                 textAlign: 'center',
                 gap: '12px',
+                flex: 1,
               }}
             >
               <IconChat size={40} color="var(--ink-secondary)" />
@@ -217,7 +231,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               </p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
               {conversations.map((conv) => (
                 <div
                   key={conv.id || conv._id}
@@ -317,8 +331,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           style={{
             display: 'flex',
             flexDirection: 'column',
-            height: '480px',
-            maxHeight: '70dvh',
+            flex: 1,
             backgroundColor: 'var(--surface)',
             padding: 0,
             overflow: 'hidden',
@@ -332,6 +345,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               justifyContent: 'space-between',
               padding: 'var(--space-16)',
               backgroundColor: 'var(--surface-raised)',
+              flexShrink: 0,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -471,6 +485,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               display: 'flex',
               gap: '8px',
               borderTop: '1px solid #232838',
+              flexShrink: 0,
             }}
           >
             <input
