@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import '../shared/styles/tokens.css';
 import { TabType, Stranger, ChatMessage, VirtualGift } from '../shared/types';
 import { INITIAL_USER } from '../shared/constants';
@@ -14,7 +14,6 @@ import { SettingsModal } from '../features/settings/components/SettingsModal';
 import { ReportModal } from '../features/matching/components/ReportModal';
 import { AuthProvider, useAuth, AuthModal } from '../features/auth';
 import { walletApi } from '../features/wallet/walletApi';
-import { useEffect } from 'react';
 import {
   IconBolt,
   IconSettings,
@@ -85,12 +84,12 @@ function AppContent() {
     ]);
   };
 
-  const handleNextStranger = () => {
+  const handleNextStranger = useCallback(() => {
     setActiveStranger(null);
     setActiveTab('matching');
-  };
+  }, []);
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = useCallback((text: string) => {
     const newMsg: ChatMessage = {
       id: `msg_${Date.now()}`,
       senderId: user.id,
@@ -119,7 +118,7 @@ function AppContent() {
         },
       ]);
     }, 1200);
-  };
+  }, [user.id, activeStranger?.id]);
 
   const handleReact = (messageId: string, emoji: string) => {
     setMessages((prev) =>

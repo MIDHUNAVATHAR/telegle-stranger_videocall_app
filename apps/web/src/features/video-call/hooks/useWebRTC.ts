@@ -28,9 +28,17 @@ export function useWebRTC({ sessionId, isInitiator = false, onCallEnded }: UseWe
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const onCallEndedRef = useRef(onCallEnded);
+
+  useEffect(() => {
+    onCallEndedRef.current = onCallEnded;
+  }, [onCallEnded]);
 
   // 1. Initialize Local Media Stream
   const initLocalStream = useCallback(async () => {
+    if (localStreamRef.current && localStreamRef.current.active) {
+      return localStreamRef.current;
+    }
     try {
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -83,7 +91,10 @@ export function useWebRTC({ sessionId, isInitiator = false, onCallEnded }: UseWe
     // Handle remote tracks
     pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
-        setRemoteStream(event.streams[0]);
+        setRemoteStream((prev) => {
+          if (prev?.id === event.streams[0].id) return prev;
+          return event.streams[0];
+        });
       }
     };
 
@@ -100,7 +111,7 @@ export function useWebRTC({ sessionId, isInitiator = false, onCallEnded }: UseWe
     pc.onconnectionstatechange = () => {
       setConnectionState(pc.connectionState);
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-        onCallEnded?.();
+        onCallEndedRef.current?.();
       }
     };
 
@@ -135,7 +146,7 @@ export function useWebRTC({ sessionId, isInitiator = false, onCallEnded }: UseWe
     });
 
     signalingSocket.on('peer_left', () => {
-      onCallEnded?.();
+      onCallEndedRef.current?.();
     });
 
     // Start local tracks and initiate call if caller
@@ -169,7 +180,7 @@ export function useWebRTC({ sessionId, isInitiator = false, onCallEnded }: UseWe
       pc.close();
       pcRef.current = null;
     };
-  }, [sessionId, isInitiator, initLocalStream, onCallEnded]);
+  }, [sessionId, isInitiator, initLocalStream]);
 
   // Controls
   const toggleMute = () => {

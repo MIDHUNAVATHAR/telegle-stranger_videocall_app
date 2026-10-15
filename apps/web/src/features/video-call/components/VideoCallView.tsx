@@ -29,6 +29,133 @@ interface VideoCallViewProps {
   onSendMessage?: (text: string) => void;
 }
 
+interface InCallChatBarProps {
+  recentMessages: { id: string; sender: string; text: string; isSelf: boolean }[];
+  onSendMessage: (text: string) => void;
+}
+
+const InCallChatBar: React.FC<InCallChatBarProps> = React.memo(({ recentMessages, onSendMessage }) => {
+  const [inputText, setInputText] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = inputText.trim();
+    if (!text) return;
+    onSendMessage(text);
+    setInputText('');
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        width: '100%',
+      }}
+    >
+      {/* Floating Recent In-call Messages Overlay */}
+      {recentMessages.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            maxWidth: '85%',
+            pointerEvents: 'none',
+          }}
+        >
+          {recentMessages.map((msg) => (
+            <div
+              key={msg.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'baseline',
+                gap: '6px',
+                backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                padding: '5px 12px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                fontSize: '12px',
+                color: '#ffffff',
+                width: 'fit-content',
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 700,
+                  color: msg.isSelf ? 'var(--accent)' : '#60a5fa',
+                }}
+              >
+                {msg.sender}:
+              </span>
+              <span style={{ fontWeight: 400 }}>{msg.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Input Message Box situated directly on top of audio/video/gift options with Send button */}
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          backgroundColor: 'rgba(12, 14, 18, 0.85)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          padding: '6px 8px 6px 14px',
+          borderRadius: 'var(--radius-full)',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+        }}
+      >
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder="Type a message..."
+          style={{
+            flex: 1,
+            backgroundColor: 'transparent',
+            border: 'none',
+            outline: 'none',
+            color: '#ffffff',
+            fontSize: '13px',
+            fontWeight: 500,
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!inputText.trim()}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '7px 16px',
+            borderRadius: 'var(--radius-full)',
+            background: inputText.trim()
+              ? 'linear-gradient(135deg, #ff7a3d 0%, #ff5a1f 100%)'
+              : 'rgba(255, 255, 255, 0.08)',
+            color: inputText.trim() ? '#ffffff' : 'rgba(255, 255, 255, 0.35)',
+            border: 'none',
+            fontSize: '12px',
+            fontWeight: 700,
+            cursor: inputText.trim() ? 'pointer' : 'default',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+});
+InCallChatBar.displayName = 'InCallChatBar';
+
 export const VideoCallView: React.FC<VideoCallViewProps> = ({
   stranger,
   sessionId = 'sess_demo_live',
@@ -40,7 +167,6 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
   onSendMessage,
 }) => {
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
-  const [inputText, setInputText] = useState('');
   const [localMessages, setLocalMessages] = useState<
     { id: string; sender: string; text: string; isSelf: boolean }[]
   >([]);
@@ -63,16 +189,20 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Attach local and remote streams to video elements
+  // Attach local and remote streams to video elements safely without causing video flicker
   useEffect(() => {
     if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+      if (localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
     }
   }, [localStream]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+      if (remoteVideoRef.current.srcObject !== remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
     }
   }, [remoteStream]);
 
@@ -102,30 +232,27 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
     onNextStranger();
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = inputText.trim();
-    if (!text) return;
-
-    if (onSendMessage) {
-      onSendMessage(text);
-    } else {
-      setLocalMessages((prev) => [
-        ...prev.slice(-3),
-        { id: `msg_${Date.now()}`, sender: 'You', text, isSelf: true },
-      ]);
-      if (stranger) {
-        setTimeout(() => {
-          setLocalMessages((prev) => [
-            ...prev.slice(-3),
-            { id: `msg_rep_${Date.now()}`, sender: stranger.name, text: '👋 Hey!', isSelf: false },
-          ]);
-        }, 1200);
+  const handleSendMessage = React.useCallback(
+    (text: string) => {
+      if (onSendMessage) {
+        onSendMessage(text);
+      } else {
+        setLocalMessages((prev) => [
+          ...prev.slice(-3),
+          { id: `msg_${Date.now()}`, sender: 'You', text, isSelf: true },
+        ]);
+        if (stranger) {
+          setTimeout(() => {
+            setLocalMessages((prev) => [
+              ...prev.slice(-3),
+              { id: `msg_rep_${Date.now()}`, sender: stranger.name, text: '👋 Hey!', isSelf: false },
+            ]);
+          }, 1200);
+        }
       }
-    }
-
-    setInputText('');
-  };
+    },
+    [onSendMessage, stranger]
+  );
 
   const recentMessages =
     messages && messages.length > 0
@@ -363,103 +490,9 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
           margin: '0 auto',
         }}
       >
-        {/* Floating Recent In-call Messages Overlay */}
-        {recentMessages.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              maxWidth: '85%',
-              pointerEvents: 'none',
-            }}
-          >
-            {recentMessages.map((msg) => (
-              <div
-                key={msg.id}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'baseline',
-                  gap: '6px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                  backdropFilter: 'blur(8px)',
-                  WebkitBackdropFilter: 'blur(8px)',
-                  padding: '5px 12px',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  fontSize: '12px',
-                  color: '#ffffff',
-                  width: 'fit-content',
-                }}
-              >
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: msg.isSelf ? 'var(--accent)' : '#60a5fa',
-                  }}
-                >
-                  {msg.sender}:
-                </span>
-                <span style={{ fontWeight: 400 }}>{msg.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Floating Recent In-call Messages and Input Box (Isolated to prevent re-rendering VideoCallView during typing) */}
+        <InCallChatBar recentMessages={recentMessages} onSendMessage={handleSendMessage} />
 
-        {/* Input Message Box situated directly on top of audio/video/gift options with Send button */}
-        <form
-          onSubmit={handleFormSubmit}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'rgba(12, 14, 18, 0.85)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            padding: '6px 8px 6px 14px',
-            borderRadius: 'var(--radius-full)',
-            border: '1px solid rgba(255, 255, 255, 0.16)',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
-          }}
-        >
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Type a message..."
-            style={{
-              flex: 1,
-              backgroundColor: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: '#ffffff',
-              fontSize: '13px',
-              fontWeight: 500,
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '7px 16px',
-              borderRadius: 'var(--radius-full)',
-              background: inputText.trim()
-                ? 'linear-gradient(135deg, #ff7a3d 0%, #ff5a1f 100%)'
-                : 'rgba(255, 255, 255, 0.08)',
-              color: inputText.trim() ? '#ffffff' : 'rgba(255, 255, 255, 0.35)',
-              border: 'none',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: inputText.trim() ? 'pointer' : 'default',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            Send
-          </button>
-        </form>
 
         {/* Primary Row: Left Leave Button, Center Audio/Video/Gift (Message logo removed), Right Next */}
         <div
