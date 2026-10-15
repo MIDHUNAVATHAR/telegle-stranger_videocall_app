@@ -11,6 +11,7 @@ import {
   IconBolt,
   IconShield,
   IconClose,
+  IconLock,
 } from '../../../shared/components/Icons';
 import { Stranger, ChatMessage } from '../../../shared/types';
 import { useWebRTC } from '../hooks/useWebRTC';
@@ -90,6 +91,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
   };
 
   const handleLeaveCall = async () => {
+    if (lockCountdown > 0) return;
     await endCall(false);
     onNextStranger();
   };
@@ -469,37 +471,39 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
             width: '100%',
           }}
         >
-          {/* Left: Prominent Leave Button */}
+          {/* Left: Prominent Leave Button with 10s Lock Countdown */}
           <button
             type="button"
             onClick={handleLeaveCall}
-            aria-label="Leave call"
+            disabled={lockCountdown > 0}
+            aria-label={lockCountdown > 0 ? `Please wait ${lockCountdown} seconds to leave` : 'Leave call'}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
+              gap: '6px',
               padding: '12px 18px',
               borderRadius: 'var(--radius-full)',
-              backgroundColor: '#ef4444',
-              color: '#ffffff',
-              border: 'none',
+              backgroundColor: lockCountdown > 0 ? 'rgba(239, 68, 68, 0.25)' : '#ef4444',
+              color: lockCountdown > 0 ? 'rgba(255, 255, 255, 0.75)' : '#ffffff',
+              border: lockCountdown > 0 ? '1px solid rgba(239, 68, 68, 0.45)' : 'none',
               fontSize: '14px',
               fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.5)',
-              transition: 'transform 0.15s ease, background-color 0.2s ease',
+              cursor: lockCountdown > 0 ? 'not-allowed' : 'pointer',
+              opacity: lockCountdown > 0 ? 0.8 : 1,
+              boxShadow: lockCountdown > 0 ? 'none' : '0 4px 20px rgba(239, 68, 68, 0.5)',
+              transition: 'all 0.2s ease',
               flexShrink: 0,
             }}
             onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
+              if (lockCountdown <= 0) e.currentTarget.style.transform = 'scale(0.95)';
             }}
             onMouseUp={(e) => {
               e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            <IconClose size={18} />
-            <span>Leave</span>
+            {lockCountdown > 0 ? <IconLock size={16} /> : <IconClose size={18} />}
+            <span>{lockCountdown > 0 ? `Leave (${lockCountdown}s)` : 'Leave'}</span>
           </button>
 
           {/* Center: Audio / Video / Gift (Message logo removed) */}

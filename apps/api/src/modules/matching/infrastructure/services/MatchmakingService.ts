@@ -179,8 +179,8 @@ export class MatchmakingService {
     await this.redis.hmset(sessionKey, session.toJSON() as Record<string, string>);
     await this.redis.expire(sessionKey, 7200);
 
-    // Set 5-second minimum call lock
-    await this.redis.setex(`call:timer:${session.id}`, 5, 'LOCKED');
+    // Set 10-second minimum call lock
+    await this.redis.setex(`call:timer:${session.id}`, 10, 'LOCKED');
 
     logger.info(`Match created: session=${session.id} between ${userId} and ${partnerId}`);
     return session;
@@ -245,6 +245,8 @@ export class MatchmakingService {
       acceptedBy: userId,
       acceptedAt: new Date().toISOString(),
     });
+    // Ensure 10-second countdown lock starts when video call begins
+    await this.redis.setex(`call:timer:${sessionId}`, 10, 'LOCKED');
     return {
       sessionId,
       status: 'ACCEPTED',

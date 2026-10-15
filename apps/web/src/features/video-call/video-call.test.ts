@@ -19,10 +19,10 @@ describe('Frontend Video Call Feature (WebRTC)', () => {
     expect(hookCode).not.toContain('turns:');
   });
 
-  it('enforces 5-second countdown lock and auto-blur in hook initial state', () => {
+  it('enforces 10-second countdown lock and auto-blur in hook initial state', () => {
     const hookCode = fs.readFileSync(path.join(__dirname, 'hooks/useWebRTC.ts'), 'utf-8');
 
-    expect(hookCode).toContain('setLockCountdown(5)');
+    expect(hookCode).toContain('setLockCountdown(10)');
     expect(hookCode).toContain('isBlurred, setIsBlurred] = useState<boolean>(true)');
   });
 });

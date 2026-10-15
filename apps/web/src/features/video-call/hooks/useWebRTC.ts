@@ -23,7 +23,7 @@ export function useWebRTC({ sessionId, isInitiator = false, onCallEnded }: UseWe
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
-  const [lockCountdown, setLockCountdown] = useState<number>(5);
+  const [lockCountdown, setLockCountdown] = useState<number>(10);
   const [isBlurred, setIsBlurred] = useState<boolean>(true);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -47,10 +47,10 @@ export function useWebRTC({ sessionId, isInitiator = false, onCallEnded }: UseWe
     return null;
   }, []);
 
-  // 2. 5-Second Countdown Lock Timer
+  // 2. 10-Second Countdown Lock Timer
   useEffect(() => {
     if (!sessionId) return;
-    setLockCountdown(5);
+    setLockCountdown(10);
 
     const interval = setInterval(() => {
       setLockCountdown((prev) => {
