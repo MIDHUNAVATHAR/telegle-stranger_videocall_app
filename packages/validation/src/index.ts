@@ -62,6 +62,7 @@ export const updateUpiIdSchema = z.object({
 export const withdrawRequestSchema = z.object({
   amountInr: z.number().min(1, 'Minimum withdrawal amount is ₹1').max(100000, 'Maximum withdrawal per request is ₹1,00,000').optional(),
   amountPaise: z.number().int().min(100, 'Minimum withdrawal is ₹1 (100 paise)').optional(),
+  coins: z.number().int().min(1, 'Minimum withdrawal is 1 gift coin').optional(),
 });
 
 // Gift Schemas

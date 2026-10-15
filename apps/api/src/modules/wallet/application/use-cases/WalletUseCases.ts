@@ -6,6 +6,7 @@ import {
   MissingPayoutUpiIdError,
   PaymentVerificationError,
   PayoutProcessingError,
+  PurchasedCoinsNonWithdrawableError,
   WalletError,
 } from '../../domain/errors/WalletErrors';
 import { IWalletRepository } from '../../domain/repositories/WalletRepository';
@@ -21,6 +22,8 @@ export class WalletUseCases {
     purchasedCoinsBalance: number;
     withdrawableEarningsPaise: number;
     withdrawableEarningsInr: number;
+    withdrawableGiftCoins: number;
+    isPurchasedCoinsWithdrawable: boolean;
     payoutUpiId?: string;
     totalEarningsWithdrawnPaise: number;
   }> {
@@ -29,6 +32,8 @@ export class WalletUseCases {
       purchasedCoinsBalance: wallet.purchasedCoinsBalance,
       withdrawableEarningsPaise: wallet.withdrawableEarningsPaise,
       withdrawableEarningsInr: Number((wallet.withdrawableEarningsPaise / 100).toFixed(2)),
+      withdrawableGiftCoins: Math.floor(wallet.withdrawableEarningsPaise / 70),
+      isPurchasedCoinsWithdrawable: false,
       payoutUpiId: wallet.payoutUpiId,
       totalEarningsWithdrawnPaise: wallet.totalEarningsWithdrawnPaise,
     };
@@ -183,15 +188,17 @@ export class WalletUseCases {
 
   async withdrawEarnings(
     userId: string,
-    params: { amountInr?: number; amountPaise?: number; narration?: string }
+    params: { amountInr?: number; amountPaise?: number; coins?: number; narration?: string }
   ): Promise<{
     payoutId: string;
     amountInr: number;
     amountPaise: number;
+    withdrawnGiftCoins?: number;
     upiId: string;
     status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
     remainingEarningsPaise: number;
     remainingEarningsInr: number;
+    remainingGiftCoins?: number;
     transaction: IWalletTransactionEntity;
   }> {
     const wallet = await this.walletRepository.createOrGet(userId);
@@ -200,14 +207,16 @@ export class WalletUseCases {
       throw new MissingPayoutUpiIdError();
     }
 
-    // Determine withdrawal amount in paise
+    // Determine withdrawal amount in paise (1 gift coin = 70 paise / 70% creator share)
     let requestedPaise: number;
-    if (params.amountPaise !== undefined && params.amountPaise > 0) {
+    if (params.coins !== undefined && params.coins > 0) {
+      requestedPaise = Math.floor(params.coins * 70);
+    } else if (params.amountPaise !== undefined && params.amountPaise > 0) {
       requestedPaise = Math.floor(params.amountPaise);
     } else if (params.amountInr !== undefined && params.amountInr > 0) {
       requestedPaise = Math.round(params.amountInr * 100);
     } else {
-      // If neither is specified, withdraw full available balance
+      // If neither is specified, withdraw full available gift earnings balance
       requestedPaise = wallet.withdrawableEarningsPaise;
     }
 
@@ -215,7 +224,11 @@ export class WalletUseCases {
       throw new WalletError('Withdrawal amount must be greater than ₹0', 400, 'INVALID_WITHDRAWAL_AMOUNT');
     }
 
-    if (requestedPaise > wallet.withdrawableEarningsPaise) {
+    // Strict Rule: User can ONLY withdraw coins earned as gifts, NEVER purchased coins
+    if (wallet.withdrawableEarningsPaise < requestedPaise) {
+      if (wallet.purchasedCoinsBalance > 0) {
+        throw new PurchasedCoinsNonWithdrawableError();
+      }
       throw new InsufficientEarningsError(requestedPaise, wallet.withdrawableEarningsPaise);
     }
 
@@ -255,10 +268,12 @@ export class WalletUseCases {
       payoutId: payoutResult.payoutId,
       amountInr: Number((requestedPaise / 100).toFixed(2)),
       amountPaise: requestedPaise,
+      withdrawnGiftCoins: Math.floor(requestedPaise / 70),
       upiId,
       status: payoutResult.status,
       remainingEarningsPaise: updatedWallet.withdrawableEarningsPaise,
       remainingEarningsInr: Number((updatedWallet.withdrawableEarningsPaise / 100).toFixed(2)),
+      remainingGiftCoins: Math.floor(updatedWallet.withdrawableEarningsPaise / 70),
       transaction,
     };
   }

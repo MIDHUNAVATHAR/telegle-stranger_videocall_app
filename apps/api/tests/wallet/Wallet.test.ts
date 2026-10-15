@@ -255,6 +255,32 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
       expect(res.body.error.code).toBe('INSUFFICIENT_EARNINGS');
     });
 
+    it('should reject withdrawal when user has purchased coins but no gift earnings', async () => {
+      // Credit purchased coins
+      await walletRepository.creditCoins(
+        testUser.id,
+        100,
+        `credit_order_${Date.now()}`,
+        'RAZORPAY_ORDER',
+        'order_123'
+      );
+
+      // Set UPI ID
+      await request(app)
+        .put('/api/v1/wallet/upi')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ upiId: 'alex@okhdfcbank' });
+
+      const res = await request(app)
+        .post('/api/v1/wallet/withdraw')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ amountInr: 50 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('PURCHASED_COINS_NON_WITHDRAWABLE');
+      expect(res.body.error.message).toContain('Purchased coins cannot be withdrawn');
+    });
+
     it('should disburse withdrawal via Razorpay, deduct balance, and log transaction', async () => {
       // 1. Link UPI ID
       await request(app)

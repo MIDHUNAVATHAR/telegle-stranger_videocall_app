@@ -71,6 +71,8 @@ export interface IWalletBalance {
   purchasedCoinsBalance: number;
   withdrawableEarningsPaise: number;
   withdrawableEarningsInr: number;
+  withdrawableGiftCoins?: number;
+  isPurchasedCoinsWithdrawable?: boolean;
   payoutUpiId?: string;
   totalEarningsWithdrawnPaise?: number;
 }
@@ -121,16 +123,19 @@ export interface IUpdateUpiIdRequest {
 export interface IWithdrawRequest {
   amountInr?: number;
   amountPaise?: number;
+  coins?: number;
 }
 
 export interface IWithdrawResponse {
   payoutId: string;
   amountInr: number;
   amountPaise: number;
+  withdrawnGiftCoins?: number;
   upiId: string;
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
   remainingEarningsPaise: number;
   remainingEarningsInr: number;
+  remainingGiftCoins?: number;
   transaction: IWalletTransaction;
 }
 

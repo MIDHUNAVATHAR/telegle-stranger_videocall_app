@@ -63,3 +63,14 @@ export class PayoutProcessingError extends WalletError {
     this.name = 'PayoutProcessingError';
   }
 }
+
+export class PurchasedCoinsNonWithdrawableError extends WalletError {
+  constructor() {
+    super(
+      'Purchased coins cannot be withdrawn or converted to cash. Only gift earnings received from other users during video roulette are eligible for withdrawal.',
+      400,
+      'PURCHASED_COINS_NON_WITHDRAWABLE'
+    );
+    this.name = 'PurchasedCoinsNonWithdrawableError';
+  }
+}

@@ -5,7 +5,7 @@ import { ICoinPackage, IWalletTransaction } from '@donkey-play/shared-types';
 import { Card } from '../../../shared/components/Card';
 import { Button } from '../../../shared/components/Button';
 import { Badge } from '../../../shared/components/Badge';
-import { IconBolt, IconClock, IconGift } from '../../../shared/components/Icons';
+import { IconBolt, IconClock, IconGift, IconShield, IconLock } from '../../../shared/components/Icons';
 import { walletApi } from '../walletApi';
 
 const DEFAULT_PACKAGES: ICoinPackage[] = [
@@ -48,10 +48,8 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
         if (balData.value.payoutUpiId) {
           setUpiId(balData.value.payoutUpiId);
           setUpiInput(balData.value.payoutUpiId);
-          setEditingUpi(false);
-        } else {
-          setEditingUpi(true);
         }
+        setEditingUpi(false);
       }
       if (pkgData.status === 'fulfilled' && pkgData.value.length > 0) {
         setPackages(pkgData.value);
@@ -96,7 +94,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
   const handleWithdraw = async () => {
     if (!upiId) {
       setEditingUpi(true);
-      setStatusMessage('Please enter and save your UPI ID before withdrawing');
+      setStatusMessage('Please link and verify your payout UPI ID before withdrawing');
       return;
     }
 
@@ -107,7 +105,9 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
     }
 
     if (parsedAmount > earningsInr) {
-      setStatusMessage(`Requested amount ₹${parsedAmount.toFixed(2)} exceeds available earnings ₹${earningsInr.toFixed(2)}`);
+      setStatusMessage(
+        `Requested amount ₹${parsedAmount.toFixed(2)} exceeds available gift earnings ₹${earningsInr.toFixed(2)}. Purchased Donkey Play coins cannot be withdrawn.`
+      );
       return;
     }
 
@@ -303,38 +303,80 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label htmlFor="upi-id-input" style={{ fontSize: 'var(--step-small)', fontWeight: 600, color: 'var(--ink)' }}>
-              Linked UPI ID (Payout Destination)
-            </label>
-            {upiId && !editingUpi && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IconShield size={16} color="var(--accent)" />
+              <span style={{ fontSize: 'var(--step-small)', fontWeight: 600, color: 'var(--ink)' }}>
+                Linked UPI ID (Payout Destination)
+              </span>
+            </div>
+            {!editingUpi && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setEditingUpi(true)}
-                style={{ fontSize: '12px', padding: '4px 8px' }}
+                onClick={() => {
+                  setUpiInput(upiId);
+                  setEditingUpi(true);
+                }}
+                style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 600, color: 'var(--accent)' }}
               >
-                Change UPI
+                {upiId ? 'Edit UPI' : '+ Add UPI'}
               </Button>
             )}
           </div>
 
-          {!editingUpi && upiId ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: '#13161c',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid #2a3042',
-              }}
-            >
-              <span style={{ fontFamily: 'monospace', fontSize: '13px', color: '#10b981', fontWeight: 600 }}>
-                {upiId}
-              </span>
-              <Badge variant="default">Verified for Payouts</Badge>
-            </div>
+          {!editingUpi ? (
+            upiId ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: '#13161c',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid #2a3042',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
+                  <span style={{ fontFamily: 'monospace', fontSize: '13px', color: '#10b981', fontWeight: 600 }}>
+                    {upiId}
+                  </span>
+                </div>
+                <Badge variant="default">Verified for Payouts</Badge>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: '#13161c',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px dashed #2a3042',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <IconLock size={15} color="var(--ink-secondary)" />
+                  <span style={{ fontSize: '13px', color: 'var(--ink-secondary)' }}>
+                    No UPI ID linked. Protected for your payout security.
+                  </span>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setUpiInput('');
+                    setEditingUpi(true);
+                  }}
+                  style={{ fontSize: '12px', padding: '4px 12px', whiteSpace: 'nowrap' }}
+                >
+                  Edit / Add UPI
+                </Button>
+              </div>
+            )
           ) : (
             <form
               onSubmit={handleSaveUpi}
@@ -346,6 +388,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
                 value={upiInput}
                 onChange={(e) => setUpiInput(e.target.value)}
                 placeholder="e.g. username@okhdfcbank or 9876543210@paytm"
+                autoFocus
                 style={{
                   flex: '1 1 200px',
                   backgroundColor: '#13161c',
@@ -366,19 +409,17 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
               >
                 {isSavingUpi ? 'Saving...' : 'Save UPI ID'}
               </Button>
-              {upiId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setUpiInput(upiId);
-                    setEditingUpi(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setUpiInput(upiId);
+                  setEditingUpi(false);
+                }}
+              >
+                Cancel
+              </Button>
             </form>
           )}
         </div>
@@ -463,11 +504,18 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
             </Button>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#f59e0b' }}>
+            <IconShield size={13} color="#f59e0b" />
+            <span>
+              Policy: Only coins received as virtual gifts from other users can be withdrawn. Purchased Donkey Play coins are non-cashoutable.
+            </span>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--ink-tertiary)' }}>
             <IconClock size={13} />
             <span>
               {!upiId
-                ? 'Save your UPI ID above to enable instant withdrawals.'
+                ? 'Link your UPI ID using the Edit button above to enable instant withdrawals.'
                 : earningsInr <= 0
                 ? 'Receive virtual gifts during video chats to earn withdrawable balance.'
                 : 'Payouts are disbursed immediately via Razorpay Payouts directly to your linked UPI address.'}
