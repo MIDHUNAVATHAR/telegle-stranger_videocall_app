@@ -46,7 +46,7 @@ export class MongooseUserRepository implements UserRepository {
 
   public async existsByUsername(username: string, excludeUserId?: string): Promise<boolean> {
     const clean = username.trim();
-    const filter: Record<string, any> = {
+    const filter: Record<string, unknown> = {
       username: { $regex: new RegExp(`^${clean}$`, 'i') },
     };
     if (excludeUserId) {
@@ -60,7 +60,7 @@ export class MongooseUserRepository implements UserRepository {
     const cleanQuery = query.trim().replace(/^@/, '');
     if (!cleanQuery) return [];
     const escaped = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const filter: Record<string, any> = {
+    const filter: Record<string, unknown> = {
       username: { $regex: new RegExp(escaped, 'i') },
       isBanned: false,
     };
