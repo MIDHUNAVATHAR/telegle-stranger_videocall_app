@@ -3,7 +3,10 @@ export interface ConversationProps {
   participantIds: [string, string];
   lastCallMatchId?: string;
   lastInteractionAt: Date;
+  lastMessageText?: string;
+  lastMessageSenderId?: string;
   hiddenByUserIds: string[];
+  videoCallEnabledByUserIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -14,7 +17,9 @@ export class Conversation {
   public static create(
     userAId: string,
     userBId: string,
-    lastCallMatchId?: string
+    lastCallMatchId?: string,
+    lastMessageText?: string,
+    lastMessageSenderId?: string
   ): Conversation {
     const sortedParticipants: [string, string] = [userAId, userBId].sort() as [string, string];
     const now = new Date();
@@ -23,7 +28,10 @@ export class Conversation {
       participantIds: sortedParticipants,
       lastCallMatchId,
       lastInteractionAt: now,
+      lastMessageText: lastMessageText || '',
+      lastMessageSenderId: lastMessageSenderId || '',
       hiddenByUserIds: [],
+      videoCallEnabledByUserIds: [],
       createdAt: now,
       updatedAt: now,
     });
@@ -47,6 +55,14 @@ export class Conversation {
 
   public get lastInteractionAt(): Date {
     return this.props.lastInteractionAt;
+  }
+
+  public get lastMessageText(): string | undefined {
+    return this.props.lastMessageText;
+  }
+
+  public get lastMessageSenderId(): string | undefined {
+    return this.props.lastMessageSenderId;
   }
 
   public get hiddenByUserIds(): string[] {
@@ -82,11 +98,45 @@ export class Conversation {
     }
   }
 
-  public recordNewCall(matchId?: string): void {
+  public get videoCallEnabledByUserIds(): string[] {
+    return this.props.videoCallEnabledByUserIds || [];
+  }
+
+  public isVideoCallEnabledBy(userId: string): boolean {
+    return (this.props.videoCallEnabledByUserIds || []).includes(userId);
+  }
+
+  public setVideoCallEnabled(userId: string, enabled: boolean): void {
+    if (!this.props.videoCallEnabledByUserIds) {
+      this.props.videoCallEnabledByUserIds = [];
+    }
+    if (enabled) {
+      if (!this.props.videoCallEnabledByUserIds.includes(userId)) {
+        this.props.videoCallEnabledByUserIds.push(userId);
+      }
+    } else {
+      this.props.videoCallEnabledByUserIds = this.props.videoCallEnabledByUserIds.filter(
+        (id) => id !== userId
+      );
+    }
+    this.props.updatedAt = new Date();
+  }
+
+  public recordNewCall(
+    matchId?: string,
+    lastMessageText?: string,
+    lastMessageSenderId?: string
+  ): void {
     this.props.lastInteractionAt = new Date();
     this.props.updatedAt = new Date();
     if (matchId) {
       this.props.lastCallMatchId = matchId;
+    }
+    if (lastMessageText !== undefined) {
+      this.props.lastMessageText = lastMessageText;
+    }
+    if (lastMessageSenderId !== undefined) {
+      this.props.lastMessageSenderId = lastMessageSenderId;
     }
     // Re-surface in inbox for both participants if previously hidden
     this.props.hiddenByUserIds = [];

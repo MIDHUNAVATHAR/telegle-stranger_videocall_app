@@ -3,6 +3,7 @@ import { COIN_PACKAGES, IWalletEntity, IWalletTransactionEntity, WalletTransacti
 import {
   InsufficientEarningsError,
   InvalidCoinPackageError,
+  MinimumWithdrawalNotMetError,
   MissingPayoutUpiIdError,
   PaymentVerificationError,
   PayoutProcessingError,
@@ -224,6 +225,20 @@ export class WalletUseCases {
       throw new WalletError('Withdrawal amount must be greater than ₹0', 400, 'INVALID_WITHDRAWAL_AMOUNT');
     }
 
+    // Strict Rule: Instant withdrawal option enables only if gift earnings is min 500 rupees (50,000 paise)
+    const MINIMUM_WITHDRAWAL_PAISE = 50000;
+    if (wallet.withdrawableEarningsPaise < MINIMUM_WITHDRAWAL_PAISE) {
+      throw new MinimumWithdrawalNotMetError(wallet.withdrawableEarningsPaise);
+    }
+
+    if (requestedPaise < MINIMUM_WITHDRAWAL_PAISE) {
+      throw new WalletError(
+        `Withdrawal amount must be at least ₹500.00 (Requested: ₹${(requestedPaise / 100).toFixed(2)})`,
+        400,
+        'MINIMUM_WITHDRAWAL_NOT_MET'
+      );
+    }
+
     // Strict Rule: User can ONLY withdraw coins earned as gifts, NEVER purchased coins
     if (wallet.withdrawableEarningsPaise < requestedPaise) {
       if (wallet.purchasedCoinsBalance > 0) {
@@ -243,7 +258,7 @@ export class WalletUseCases {
         amountPaise: requestedPaise,
         upiId,
         referenceId,
-        narration: params.narration || 'Donkey Play Creator Payout',
+        narration: params.narration || 'Telegle Creator Payout',
       });
     } catch (err: unknown) {
       const error = err as Error;

@@ -17,6 +17,13 @@ export const displayNameSchema = z
   .min(2, 'Display name must be at least 2 characters')
   .max(30, 'Display name must not exceed 30 characters');
 
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, 'Username must be at least 3 characters')
+  .max(30, 'Username must not exceed 30 characters')
+  .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores');
+
 export const ageSchema = z
   .number()
   .int('Age must be a whole number')
@@ -60,9 +67,9 @@ export const updateUpiIdSchema = z.object({
 });
 
 export const withdrawRequestSchema = z.object({
-  amountInr: z.number().min(1, 'Minimum withdrawal amount is ₹1').max(100000, 'Maximum withdrawal per request is ₹1,00,000').optional(),
-  amountPaise: z.number().int().min(100, 'Minimum withdrawal is ₹1 (100 paise)').optional(),
-  coins: z.number().int().min(1, 'Minimum withdrawal is 1 gift coin').optional(),
+  amountInr: z.number().min(500, 'Minimum withdrawal amount is ₹500').max(100000, 'Maximum withdrawal per request is ₹1,00,000').optional(),
+  amountPaise: z.number().int().min(50000, 'Minimum withdrawal is ₹500 (50,000 paise)').optional(),
+  coins: z.number().int().min(715, 'Minimum withdrawal is 715 gift coins (₹500.50)').optional(),
 });
 
 // Gift Schemas

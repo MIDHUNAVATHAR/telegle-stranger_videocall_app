@@ -24,12 +24,23 @@ export class RedisOtpService {
       throw new OtpCooldownError(cooldownTtl);
     }
 
-    // 2. Check IP rate limit (max 10 requests / hour)
+    // 2. Check IP rate limit (configurable, default 10 requests / hour in production, 100 in dev/local)
+    const isLocalOrDev =
+      process.env.NODE_ENV === 'development' ||
+      process.env.NODE_ENV === 'test' ||
+      ip === '127.0.0.1' ||
+      ip === '::1' ||
+      ip === '::ffff:127.0.0.1';
+    const maxRequestsPerIp = parseInt(
+      process.env.OTP_RATE_LIMIT_IP_MAX || (isLocalOrDev ? '100' : '10'),
+      10
+    );
+
     const ipRequests = await this.redis.incr(ipKey);
     if (ipRequests === 1) {
       await this.redis.expire(ipKey, 3600);
     }
-    if (ipRequests > 10) {
+    if (ipRequests > maxRequestsPerIp) {
       throw new RateLimitExceededError('Too many verification requests from this IP. Please wait.');
     }
 

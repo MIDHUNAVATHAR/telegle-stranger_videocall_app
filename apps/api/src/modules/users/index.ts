@@ -39,7 +39,8 @@ export const createUsersModule = (options: CreateUsersModuleOptions = {}): Users
     getUserById,
     updateUserProfile,
     preferences,
-    cloudinaryService
+    cloudinaryService,
+    repository
   );
   const router = createUserRouter(controller);
 

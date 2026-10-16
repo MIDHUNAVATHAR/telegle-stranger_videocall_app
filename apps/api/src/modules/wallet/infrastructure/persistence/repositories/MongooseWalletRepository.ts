@@ -4,6 +4,13 @@ import { InsufficientCoinsError, InsufficientEarningsError } from '../../../doma
 import { IWalletRepository } from '../../../domain/repositories/WalletRepository';
 import { IWalletDocument, IWalletTransactionDocument, WalletModel, WalletTransactionModel } from '../mongoose/WalletModel';
 
+function toDbUserId(userId: string): Types.ObjectId | string {
+  if (Types.ObjectId.isValid(userId) && userId.length === 24 && !userId.includes('-')) {
+    return new Types.ObjectId(userId);
+  }
+  return userId;
+}
+
 export class MongooseWalletRepository implements IWalletRepository {
   // In-memory fallback map for unit tests when MongoDB daemon is not running
   private inMemoryWallets = new Map<string, IWalletEntity>();
@@ -52,7 +59,7 @@ export class MongooseWalletRepository implements IWalletRepository {
 
   async findByUserId(userId: string): Promise<IWalletEntity | null> {
     if (mongoose.connection.readyState === 1) {
-      const doc = await WalletModel.findOne({ user_id: new Types.ObjectId(userId) });
+      const doc = await WalletModel.findOne({ user_id: toDbUserId(userId) });
       return doc ? this.mapWallet(doc) : null;
     }
     return this.inMemoryWallets.get(userId) || null;
@@ -60,7 +67,7 @@ export class MongooseWalletRepository implements IWalletRepository {
 
   async createOrGet(userId: string): Promise<IWalletEntity> {
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = toDbUserId(userId);
       let doc = await WalletModel.findOne({ user_id: userObjectId });
       if (!doc) {
         try {
@@ -114,7 +121,7 @@ export class MongooseWalletRepository implements IWalletRepository {
     }
 
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = toDbUserId(userId);
       const updatedWallet = await WalletModel.findOneAndUpdate(
         { user_id: userObjectId },
         {
@@ -194,7 +201,7 @@ export class MongooseWalletRepository implements IWalletRepository {
     }
 
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = toDbUserId(userId);
       const updatedWallet = await WalletModel.findOneAndUpdate(
         {
           user_id: userObjectId,
@@ -287,7 +294,7 @@ export class MongooseWalletRepository implements IWalletRepository {
     }
 
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = toDbUserId(userId);
       const updatedWallet = await WalletModel.findOneAndUpdate(
         { user_id: userObjectId },
         {
@@ -357,7 +364,7 @@ export class MongooseWalletRepository implements IWalletRepository {
     limit: number = 20
   ): Promise<{ transactions: IWalletTransactionEntity[]; total: number }> {
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = toDbUserId(userId);
       const skip = (page - 1) * limit;
 
       const [docs, total] = await Promise.all([
@@ -401,7 +408,7 @@ export class MongooseWalletRepository implements IWalletRepository {
 
   async updatePayoutUpiId(userId: string, upiId: string): Promise<IWalletEntity> {
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = toDbUserId(userId);
       const updatedWallet = await WalletModel.findOneAndUpdate(
         { user_id: userObjectId },
         {
@@ -434,7 +441,7 @@ export class MongooseWalletRepository implements IWalletRepository {
     }
 
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = toDbUserId(userId);
       const updatedWallet = await WalletModel.findOneAndUpdate(
         {
           user_id: userObjectId,

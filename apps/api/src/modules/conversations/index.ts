@@ -11,15 +11,19 @@ import {
   DeleteConversationUseCase,
   DirectCallUseCase,
   RecordCallConnectionUseCase,
+  ToggleVideoCallPermissionUseCase,
 } from './application/use-cases/ConversationUseCases';
 import { ConversationController } from './presentation/http/controllers/ConversationController';
 import { createConversationRouter } from './presentation/http/routes/ConversationRoutes';
+
+import { PresenceService } from '../matching/infrastructure/services/PresenceService';
 
 export interface ConversationsModuleOptions {
   conversationRepository?: ConversationRepository;
   userRepository?: UserRepository;
   preferencesUseCase?: UserPreferencesUseCase;
   matchmakingService?: MatchmakingService;
+  presenceService?: PresenceService;
 }
 
 export interface ConversationsModule {
@@ -32,6 +36,7 @@ export interface ConversationsModule {
     delete: DeleteConversationUseCase;
     directCall: DirectCallUseCase;
     recordCall: RecordCallConnectionUseCase;
+    toggleVideoCall: ToggleVideoCallPermissionUseCase;
   };
 }
 
@@ -43,9 +48,10 @@ export const createConversationsModule = (
   const userRepository = options.userRepository ?? new MongooseUserRepository();
   const preferencesUseCase = options.preferencesUseCase ?? new UserPreferencesUseCase();
   const matchmakingService = options.matchmakingService ?? new MatchmakingService();
+  const presenceService = options.presenceService ?? new PresenceService();
 
-  const list = new ListConversationsUseCase(conversationRepository, userRepository);
-  const getById = new GetConversationByIdUseCase(conversationRepository, userRepository);
+  const list = new ListConversationsUseCase(conversationRepository, userRepository, presenceService);
+  const getById = new GetConversationByIdUseCase(conversationRepository, userRepository, presenceService);
   const deleteUseCase = new DeleteConversationUseCase(conversationRepository);
   const directCall = new DirectCallUseCase(
     conversationRepository,
@@ -53,8 +59,16 @@ export const createConversationsModule = (
     matchmakingService
   );
   const recordCall = new RecordCallConnectionUseCase(conversationRepository);
+  const toggleVideoCall = new ToggleVideoCallPermissionUseCase(conversationRepository);
 
-  const controller = new ConversationController(list, getById, deleteUseCase, directCall);
+  const controller = new ConversationController(
+    list,
+    getById,
+    deleteUseCase,
+    directCall,
+    toggleVideoCall,
+    recordCall
+  );
   const router = createConversationRouter(controller);
 
   return {
@@ -67,6 +81,7 @@ export const createConversationsModule = (
       delete: deleteUseCase,
       directCall,
       recordCall,
+      toggleVideoCall,
     },
   };
 };

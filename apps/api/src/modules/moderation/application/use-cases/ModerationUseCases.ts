@@ -130,4 +130,12 @@ export class ModerationUseCases {
   async isBlocked(userAId: string, userBId: string): Promise<boolean> {
     return this.moderationRepository.isBlocked(userAId, userBId);
   }
+
+  async checkBlockStatus(userId: string, targetUserId: string): Promise<{ isBlockedByMe: boolean; isBlockedByThem: boolean }> {
+    const res = await this.moderationRepository.checkBlockStatus(userId, targetUserId);
+    return {
+      isBlockedByMe: res.isBlockedByA,
+      isBlockedByThem: res.isBlockedByB,
+    };
+  }
 }

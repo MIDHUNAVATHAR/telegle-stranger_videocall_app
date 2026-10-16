@@ -3,6 +3,7 @@ export type TabType = 'matching' | 'video-call' | 'chat' | 'wallet' | 'profile';
 export interface UserProfile {
   id: string;
   name: string;
+  email?: string;
   tag: string;
   avatar: string;
   coins: number;
@@ -38,6 +39,8 @@ export interface ChatMessage {
   timestamp: string;
   isSelf: boolean;
   reaction?: string;
+  isRead?: boolean;
+  createdAt?: number;
 }
 
 export interface VirtualGift {

@@ -42,7 +42,7 @@ export const EmailStep: React.FC<EmailStepProps> = ({
       <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <img
           src="/logo.png"
-          alt="Donkey Play Mascot"
+          alt="Telegle Mascot"
           style={{
             width: '64px',
             height: '64px',
@@ -52,7 +52,7 @@ export const EmailStep: React.FC<EmailStepProps> = ({
           }}
         />
         <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#f5f6f8', marginBottom: '8px' }}>
-          Welcome to Donkey Play
+          Welcome to Telegle
         </h2>
         <p style={{ fontSize: '14px', color: '#9ea4b4' }}>
           Connect, chat, and meet genuine people in real-time.

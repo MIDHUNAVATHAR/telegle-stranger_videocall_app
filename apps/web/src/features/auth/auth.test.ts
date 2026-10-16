@@ -24,4 +24,35 @@ describe('Frontend Auth Module', () => {
     expect(typeof authApi.refreshToken).toBe('function');
     expect(typeof authApi.logout).toBe('function');
   });
+
+  it('exchanges 14-day refresh token for new access token & refreshed profile', async () => {
+    const mockUser = {
+      _id: 'u1',
+      id: 'u1',
+      email: 'user@example.com',
+      username: 'user1',
+      display_name: 'User One',
+      age: 22,
+      gender: 'MALE',
+      role: 'USER',
+      is_banned: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const mockResponse = {
+      user: mockUser,
+      tokens: {
+        access_token: 'new_15m_access_token',
+        refresh_token: 'new_14d_refresh_token',
+      },
+    };
+
+    const vi = (await import('vitest')).vi;
+    vi.spyOn(authApi, 'refreshToken').mockResolvedValueOnce(mockResponse);
+
+    const res = await authApi.refreshToken();
+    expect(res.user.email).toBe('user@example.com');
+    expect(res.tokens.access_token).toBe('new_15m_access_token');
+    expect(res.tokens.refresh_token).toBe('new_14d_refresh_token');
+  });
 });

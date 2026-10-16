@@ -11,3 +11,9 @@ export class DirectCallNotAllowedError extends AppError {
     super(message, 403, 'DIRECT_CALL_NOT_ALLOWED');
   }
 }
+
+export class UserAlreadyInCallError extends AppError {
+  constructor(message = 'User is already in another video call') {
+    super(message, 409, 'USER_BUSY');
+  }
+}

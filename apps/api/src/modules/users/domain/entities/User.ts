@@ -61,7 +61,7 @@ export class User {
 
     const age = props.age ?? 18;
     if (age < 18) {
-      throw new ValidationError('You must be at least 18 years old to use Donkey Play');
+      throw new ValidationError('You must be at least 18 years old to use Telegle');
     }
 
     const now = new Date();
@@ -168,12 +168,22 @@ export class User {
   }
 
   public updateProfile(params: {
+    username?: string;
     displayName?: string;
     bio?: string;
     gender?: UserGender;
     avatarUrl?: string;
     age?: number;
   }): void {
+    if (params.username) {
+      const trimmed = params.username.trim();
+      const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+      if (!usernameRegex.test(trimmed)) {
+        throw new ValidationError('Username must be between 3 and 30 characters and contain only letters, numbers, and underscores');
+      }
+      this.props.username = trimmed;
+      this.props.displayName = trimmed;
+    }
     if (params.displayName) {
       const trimmed = params.displayName.trim();
       if (trimmed.length < 2 || trimmed.length > 30) {

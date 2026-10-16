@@ -13,7 +13,10 @@ export class MongooseConversationRepository implements ConversationRepository {
       participantIds: doc.participant_ids as [string, string],
       lastCallMatchId: doc.last_call_match_id,
       lastInteractionAt: doc.last_interaction_at,
+      lastMessageText: doc.last_message_text || '',
+      lastMessageSenderId: doc.last_message_sender_id || '',
       hiddenByUserIds: doc.hidden_by_user_ids,
+      videoCallEnabledByUserIds: doc.video_call_enabled_by_user_ids || [],
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     });
@@ -31,14 +34,19 @@ export class MongooseConversationRepository implements ConversationRepository {
     const sorted: [string, string] = [userAId, userBId].sort() as [string, string];
 
     if (mongoose.connection.readyState === 1) {
-      const doc = await ConversationModel.findOne({ participant_ids: sorted }).exec();
+      const doc = await ConversationModel.findOne({
+        $or: [
+          { participant_ids: sorted },
+          { participant_ids: { $all: [userAId, userBId], $size: 2 } },
+        ],
+      }).exec();
       return doc ? this.toDomain(doc) : null;
     }
 
     for (const conv of this.inMemoryStore.values()) {
       if (
-        conv.participantIds[0] === sorted[0] &&
-        conv.participantIds[1] === sorted[1]
+        (conv.participantIds[0] === userAId && conv.participantIds[1] === userBId) ||
+        (conv.participantIds[0] === userBId && conv.participantIds[1] === userAId)
       ) {
         return conv;
       }
@@ -95,7 +103,13 @@ export class MongooseConversationRepository implements ConversationRepository {
             participant_ids: conversation.participantIds,
             last_call_match_id: conversation.lastCallMatchId,
             last_interaction_at: conversation.lastInteractionAt,
+            last_message_text: conversation.lastMessageText || '',
+            last_message_sender_id: conversation.lastMessageSenderId || '',
             hidden_by_user_ids: conversation.hiddenByUserIds,
+            video_call_enabled_by_user_ids: conversation.videoCallEnabledByUserIds,
+          },
+          $setOnInsert: {
+            _id: conversation.id,
           },
         },
         { new: true, upsert: true, setDefaultsOnInsert: true }

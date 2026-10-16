@@ -74,3 +74,15 @@ export class PurchasedCoinsNonWithdrawableError extends WalletError {
     this.name = 'PurchasedCoinsNonWithdrawableError';
   }
 }
+
+export class MinimumWithdrawalNotMetError extends WalletError {
+  constructor(currentPaise?: number) {
+    const detail = currentPaise !== undefined ? ` Current gift earnings: ₹${(currentPaise / 100).toFixed(2)}` : '';
+    super(
+      `Instant withdrawal requires a minimum of ₹500 in gift earnings.${detail}`,
+      400,
+      'MINIMUM_WITHDRAWAL_NOT_MET'
+    );
+    this.name = 'MinimumWithdrawalNotMetError';
+  }
+}

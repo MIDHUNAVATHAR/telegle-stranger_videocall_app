@@ -21,6 +21,9 @@ export const createUserRouter = (controller: UserController): Router => {
   // User registration (legacy / direct)
   router.post('/', validateRequest(createUserSchema), controller.registerUser);
 
+  // Search users by username (for direct messaging / chat initiation)
+  router.get('/search', authMiddleware, controller.searchUsers);
+
   // Public profile lookup
   router.get('/:id', validateRequest(getUserByIdSchema), controller.getUserById);
 

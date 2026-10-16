@@ -3,6 +3,7 @@ import { CannotGiftSelfError, GiftNotFoundError } from '../../domain/errors/Gift
 import { IGiftRepository } from '../../domain/repositories/GiftRepository';
 import { IWalletRepository } from '../../../wallet/domain/repositories/WalletRepository';
 import { WalletUseCases } from '../../../wallet/application/use-cases/WalletUseCases';
+import { env } from '../../../../config/env';
 
 export class GiftUseCases {
   constructor(
@@ -12,7 +13,18 @@ export class GiftUseCases {
   ) {}
 
   async listGifts(): Promise<IGiftEntity[]> {
-    return this.giftRepository.listActiveGifts();
+    const rawGifts = await this.giftRepository.listActiveGifts();
+    const commission = env.PLATFORM_COMMISSION_GIFT;
+    return rawGifts.map((g) => {
+      const totalValuePaise = g.coinPrice * 100;
+      const platformFeePaise = Math.round(totalValuePaise * (commission / 100));
+      const creatorEarningPaise = totalValuePaise - platformFeePaise;
+      return {
+        ...g,
+        platformFeePaise,
+        creatorEarningPaise,
+      };
+    });
   }
 
   async sendGift(
@@ -29,10 +41,22 @@ export class GiftUseCases {
       throw new CannotGiftSelfError();
     }
 
-    const gift = await this.giftRepository.findBySlug(giftSlug);
-    if (!gift || !gift.isActive) {
+    const rawGift = await this.giftRepository.findBySlug(giftSlug);
+    if (!rawGift || !rawGift.isActive) {
       throw new GiftNotFoundError(giftSlug);
     }
+
+    // Dynamic platform commission deduction logic from env
+    const commission = env.PLATFORM_COMMISSION_GIFT;
+    const totalValuePaise = rawGift.coinPrice * 100;
+    const platformFeePaise = Math.round(totalValuePaise * (commission / 100));
+    const creatorEarningPaise = totalValuePaise - platformFeePaise;
+
+    const gift: IGiftEntity = {
+      ...rawGift,
+      platformFeePaise,
+      creatorEarningPaise,
+    };
 
     const idempotencyKey = `gift_send_${senderId}_${recipientId}_${Date.now()}_${Math.random()
       .toString(36)
@@ -53,10 +77,10 @@ export class GiftUseCases {
       }
     );
 
-    // 2. Credit recipient's with 70% earnings in paise
+    // 2. Credit recipient's wallet with earnings after deducting platform commission
     await this.walletRepository.creditEarningsPaise(
       recipientId,
-      gift.creatorEarningPaise,
+      creatorEarningPaise,
       `recv_${idempotencyKey}`,
       'GIFT',
       gift.id,
@@ -64,6 +88,8 @@ export class GiftUseCases {
         senderId,
         giftSlug: gift.slug,
         giftName: gift.name,
+        platformCommissionPercentage: commission,
+        platformFeePaise,
       }
     );
 
@@ -75,8 +101,8 @@ export class GiftUseCases {
       recipientId,
       matchSessionId,
       coinsSpent: gift.coinPrice,
-      creatorEarningsPaise: gift.creatorEarningPaise,
-      platformFeePaise: gift.platformFeePaise,
+      creatorEarningsPaise: creatorEarningPaise,
+      platformFeePaise,
     });
 
     return {

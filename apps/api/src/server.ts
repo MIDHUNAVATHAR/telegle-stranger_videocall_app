@@ -17,21 +17,21 @@ const startServer = async () => {
     const socketServer = new SocketServer(httpServer);
 
     const server = httpServer.listen(env.PORT, () => {
-      logger.info(`[Donkey Play API] Server listening on http://localhost:${env.PORT} in ${env.NODE_ENV} mode`);
-      logger.info(`[Donkey Play API] Interactive documentation available at http://localhost:${env.PORT}/api/docs`);
+      logger.info(`[Telegle API] Server listening on http://localhost:${env.PORT} in ${env.NODE_ENV} mode`);
+      logger.info(`[Telegle API] Interactive documentation available at http://localhost:${env.PORT}/api/docs`);
     });
 
     const gracefulShutdown = async (signal: string) => {
-      logger.info(`[Donkey Play API] Received ${signal}. Shutting down gracefully...`);
+      logger.info(`[Telegle API] Received ${signal}. Shutting down gracefully...`);
       socketServer.close();
       server.close(async () => {
         try {
           await disconnectRedis();
           await disconnectDatabase();
-          logger.info('[Donkey Play API] All infrastructure disconnected cleanly. Exiting.');
+          logger.info('[Telegle API] All infrastructure disconnected cleanly. Exiting.');
           process.exit(0);
         } catch (err) {
-          logger.error('[Donkey Play API] Error during graceful shutdown:', err);
+          logger.error('[Telegle API] Error during graceful shutdown:', err);
           process.exit(1);
         }
       });
@@ -42,7 +42,7 @@ const startServer = async () => {
 
     return server;
   } catch (error) {
-    logger.error('[Donkey Play API] Fatal error starting server:', error);
+    logger.error('[Telegle API] Fatal error starting server:', error);
     process.exit(1);
   }
 };

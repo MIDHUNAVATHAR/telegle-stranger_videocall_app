@@ -35,6 +35,22 @@ export const createAuthMiddleware = (tokenService: JwtTokenService = new JwtToke
       }
     }
 
+    // 3. Fall back to refresh token in cookie if access token is missing
+    if (!token && req.cookies && req.cookies.dp_refresh_token) {
+      try {
+        const refreshPayload = tokenService.verifyRefreshToken(req.cookies.dp_refresh_token);
+        req.user = {
+          id: refreshPayload.sub,
+          role: 'USER',
+          isBanned: false,
+        };
+        next();
+        return;
+      } catch {
+        // Fall through to error
+      }
+    }
+
     if (!token) {
       next(new UnauthorizedError('Authentication token required'));
       return;
@@ -56,6 +72,21 @@ export const createAuthMiddleware = (tokenService: JwtTokenService = new JwtToke
 
       next();
     } catch (error) {
+      // If access token expired, check if valid refresh token exists in cookies
+      if (req.cookies && req.cookies.dp_refresh_token) {
+        try {
+          const refreshPayload = tokenService.verifyRefreshToken(req.cookies.dp_refresh_token);
+          req.user = {
+            id: refreshPayload.sub,
+            role: 'USER',
+            isBanned: false,
+          };
+          next();
+          return;
+        } catch {
+          // Fall through
+        }
+      }
       next(error);
     }
   };

@@ -3,9 +3,10 @@ import React from 'react';
 export interface BadgeProps {
   variant?: 'default' | 'accent' | 'success' | 'danger';
   children: React.ReactNode;
+  style?: React.CSSProperties;
 }
 
-export const Badge: React.FC<BadgeProps> = ({ variant = 'default', children }) => {
+export const Badge: React.FC<BadgeProps> = ({ variant = 'default', children, style }) => {
   const getStyle = (): React.CSSProperties => {
     switch (variant) {
       case 'accent':
@@ -46,6 +47,7 @@ export const Badge: React.FC<BadgeProps> = ({ variant = 'default', children }) =
         fontSize: 'var(--step-small)',
         lineHeight: 1.2,
         ...getStyle(),
+        ...style,
       }}
     >
       {children}

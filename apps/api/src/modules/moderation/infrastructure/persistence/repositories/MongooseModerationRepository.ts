@@ -3,6 +3,14 @@ import { IBlockEntity, IReportEntity } from '../../../domain/entities/Report';
 import { IModerationRepository } from '../../../domain/repositories/ModerationRepository';
 import { BlockModel, IBlockDocument, IReportDocument, ReportModel } from '../mongoose/ModerationModel';
 
+function toDbId(id?: string): Types.ObjectId | string | undefined {
+  if (!id) return undefined;
+  if (Types.ObjectId.isValid(id) && id.length === 24 && !id.includes('-')) {
+    return new Types.ObjectId(id);
+  }
+  return id;
+}
+
 export class MongooseModerationRepository implements IModerationRepository {
   private inMemoryReports: IReportEntity[] = [];
   private inMemoryBlocks = new Map<string, IBlockEntity>();
@@ -40,9 +48,9 @@ export class MongooseModerationRepository implements IModerationRepository {
   async createReport(report: Omit<IReportEntity, 'id' | 'createdAt'>): Promise<IReportEntity> {
     if (mongoose.connection.readyState === 1) {
       const doc = await ReportModel.create({
-        reporter_id: new Types.ObjectId(report.reporterId),
-        reported_user_id: new Types.ObjectId(report.reportedUserId),
-        match_id: report.matchSessionId ? new Types.ObjectId(report.matchSessionId) : undefined,
+        reporter_id: toDbId(report.reporterId),
+        reported_user_id: toDbId(report.reportedUserId),
+        match_id: toDbId(report.matchSessionId),
         reason: report.reason,
         details: report.details,
         status: report.status,
@@ -62,8 +70,8 @@ export class MongooseModerationRepository implements IModerationRepository {
 
   async createBlock(block: Omit<IBlockEntity, 'id' | 'createdAt'>): Promise<IBlockEntity> {
     if (mongoose.connection.readyState === 1) {
-      const userObjectId = new Types.ObjectId(block.userId);
-      const blockedObjectId = new Types.ObjectId(block.blockedUserId);
+      const userObjectId = toDbId(block.userId);
+      const blockedObjectId = toDbId(block.blockedUserId);
 
       const doc = await BlockModel.findOneAndUpdate(
         { user_id: userObjectId, blocked_user_id: blockedObjectId },
@@ -90,8 +98,8 @@ export class MongooseModerationRepository implements IModerationRepository {
   async deleteBlock(userId: string, blockedUserId: string): Promise<boolean> {
     if (mongoose.connection.readyState === 1) {
       const res = await BlockModel.deleteOne({
-        user_id: new Types.ObjectId(userId),
-        blocked_user_id: new Types.ObjectId(blockedUserId),
+        user_id: toDbId(userId),
+        blocked_user_id: toDbId(blockedUserId),
       });
       return (res.deletedCount || 0) > 0;
     }
@@ -104,7 +112,7 @@ export class MongooseModerationRepository implements IModerationRepository {
     const now = new Date();
     if (mongoose.connection.readyState === 1) {
       const docs = await BlockModel.find({
-        user_id: new Types.ObjectId(userId),
+        user_id: toDbId(userId),
         $or: [{ expires_at: null }, { expires_at: { $gt: now } }],
       });
       return docs.map((d) => this.mapBlock(d));
@@ -120,8 +128,8 @@ export class MongooseModerationRepository implements IModerationRepository {
   async isBlocked(userAId: string, userBId: string): Promise<boolean> {
     const now = new Date();
     if (mongoose.connection.readyState === 1) {
-      const aObj = new Types.ObjectId(userAId);
-      const bObj = new Types.ObjectId(userBId);
+      const aObj = toDbId(userAId);
+      const bObj = toDbId(userBId);
 
       const count = await BlockModel.countDocuments({
         $and: [
@@ -153,5 +161,45 @@ export class MongooseModerationRepository implements IModerationRepository {
     }
 
     return false;
+  }
+
+  async checkBlockStatus(userAId: string, userBId: string): Promise<{ isBlockedByA: boolean; isBlockedByB: boolean }> {
+    const now = new Date();
+    if (mongoose.connection.readyState === 1) {
+      const aObj = toDbId(userAId);
+      const bObj = toDbId(userBId);
+
+      const [byA, byB] = await Promise.all([
+        BlockModel.countDocuments({
+          user_id: aObj,
+          blocked_user_id: bObj,
+          $or: [{ expires_at: null }, { expires_at: { $gt: now } }],
+        }),
+        BlockModel.countDocuments({
+          user_id: bObj,
+          blocked_user_id: aObj,
+          $or: [{ expires_at: null }, { expires_at: { $gt: now } }],
+        }),
+      ]);
+
+      return {
+        isBlockedByA: byA > 0,
+        isBlockedByB: byB > 0,
+      };
+    }
+
+    const key1 = `${userAId}:${userBId}`;
+    const key2 = `${userBId}:${userAId}`;
+
+    const b1 = this.inMemoryBlocks.get(key1);
+    const b2 = this.inMemoryBlocks.get(key2);
+
+    const isAValid = b1 ? (!b1.expiresAt || b1.expiresAt.getTime() > now.getTime()) : false;
+    const isBValid = b2 ? (!b2.expiresAt || b2.expiresAt.getTime() > now.getTime()) : false;
+
+    return {
+      isBlockedByA: isAValid,
+      isBlockedByB: isBValid,
+    };
   }
 }

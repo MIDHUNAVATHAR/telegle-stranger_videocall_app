@@ -1,16 +1,24 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface ConversationDocument extends Document {
+export interface ConversationDocument {
+  _id: string;
   participant_ids: string[];
   last_call_match_id?: string;
   last_interaction_at: Date;
+  last_message_text?: string;
+  last_message_sender_id?: string;
   hidden_by_user_ids: string[];
+  video_call_enabled_by_user_ids: string[];
   createdAt: Date;
   updatedAt: Date;
 }
 
 const ConversationSchema = new Schema<ConversationDocument>(
   {
+    _id: {
+      type: String,
+      required: true,
+    },
     participant_ids: {
       type: [String],
       required: true,
@@ -25,12 +33,25 @@ const ConversationSchema = new Schema<ConversationDocument>(
       required: true,
       default: Date.now,
     },
+    last_message_text: {
+      type: String,
+      default: '',
+    },
+    last_message_sender_id: {
+      type: String,
+      default: '',
+    },
     hidden_by_user_ids: {
+      type: [String],
+      default: [],
+    },
+    video_call_enabled_by_user_ids: {
       type: [String],
       default: [],
     },
   },
   {
+    _id: false,
     timestamps: true,
     collection: 'conversations',
   }

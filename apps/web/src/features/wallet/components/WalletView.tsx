@@ -5,7 +5,7 @@ import { ICoinPackage, IWalletTransaction } from '@donkey-play/shared-types';
 import { Card } from '../../../shared/components/Card';
 import { Button } from '../../../shared/components/Button';
 import { Badge } from '../../../shared/components/Badge';
-import { IconBolt, IconClock, IconGift, IconShield, IconLock } from '../../../shared/components/Icons';
+import { IconClock, IconGift, IconShield, IconLock, IconDollar } from '../../../shared/components/Icons';
 import { walletApi } from '../walletApi';
 
 const DEFAULT_PACKAGES: ICoinPackage[] = [
@@ -21,7 +21,7 @@ interface WalletViewProps {
 }
 
 export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddCoins }) => {
-  const [balance, setBalance] = useState<number>(propCoins ?? 0);
+  const [, setBalance] = useState<number>(propCoins ?? 0);
   const [earningsInr, setEarningsInr] = useState<number>(0);
   const [upiId, setUpiId] = useState<string>('');
   const [editingUpi, setEditingUpi] = useState<boolean>(false);
@@ -55,7 +55,14 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
         setPackages(pkgData.value);
       }
       if (txData.status === 'fulfilled') {
-        setTransactions(txData.value.transactions);
+        const val = txData.value as unknown;
+        if (Array.isArray(val)) {
+          setTransactions(val);
+        } else if (val && typeof val === 'object' && Array.isArray((val as { transactions?: IWalletTransaction[] }).transactions)) {
+          setTransactions((val as { transactions: IWalletTransaction[] }).transactions);
+        } else {
+          setTransactions([]);
+        }
       }
     } catch {
       // Keep defaults gracefully
@@ -98,15 +105,20 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
       return;
     }
 
+    if (earningsInr < 500) {
+      setStatusMessage('Minimum gift earnings required for instant withdrawal is ₹500.00');
+      return;
+    }
+
     const parsedAmount = withdrawAmount ? parseFloat(withdrawAmount) : earningsInr;
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setStatusMessage('Please enter a valid withdrawal amount greater than ₹0');
+    if (isNaN(parsedAmount) || parsedAmount < 500) {
+      setStatusMessage('Minimum withdrawal amount is ₹500.00');
       return;
     }
 
     if (parsedAmount > earningsInr) {
       setStatusMessage(
-        `Requested amount ₹${parsedAmount.toFixed(2)} exceeds available gift earnings ₹${earningsInr.toFixed(2)}. Purchased Donkey Play coins cannot be withdrawn.`
+        `Requested amount ₹${parsedAmount.toFixed(2)} exceeds available gift earnings ₹${earningsInr.toFixed(2)}. Purchased Telegle coins cannot be withdrawn.`
       );
       return;
     }
@@ -147,7 +159,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
           key: order.keyId,
           amount: order.amount,
           currency: order.currency,
-          name: 'Donkey Play Coins',
+          name: 'Telegle Coins',
           description: `Purchase ${pkg.totalCoins} Coins`,
           order_id: order.orderId,
           handler: async (response: {
@@ -192,78 +204,37 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
   };
 
   return (
-    <div data-ui style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)', padding: '16px' }}>
+    <div data-ui style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)', padding: '16px 0 24px 0', width: '100%' }}>
       {/* Feedback Banner */}
       {statusMessage && (
-        <div
-          role="alert"
-          style={{
-            padding: '12px 16px',
-            backgroundColor: statusMessage.includes('failed') || statusMessage.includes('exceeds') ? '#7f1d1d' : '#14532d',
-            color: '#fff',
-            borderRadius: 'var(--radius-md)',
-            fontSize: 'var(--step-small)',
-            fontWeight: 600,
-            textAlign: 'center',
-          }}
-        >
-          {statusMessage}
+        <div style={{ padding: '0 16px' }}>
+          <div
+            role="alert"
+            style={{
+              padding: '12px 16px',
+              backgroundColor: statusMessage.includes('failed') || statusMessage.includes('exceeds') ? '#7f1d1d' : '#14532d',
+              color: '#fff',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--step-small)',
+              fontWeight: 600,
+              textAlign: 'center',
+            }}
+          >
+            {statusMessage}
+          </div>
         </div>
       )}
-
-      {/* Main Balance Card */}
-      <Card
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: 'var(--space-12)',
-          padding: 'var(--space-24)',
-          backgroundColor: 'var(--surface-raised)',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 'var(--step-small)',
-            color: 'var(--ink-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          Purchased Coins Balance
-        </span>
-        <h1
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--step-head)',
-            fontWeight: 800,
-            color: 'var(--accent)',
-            letterSpacing: '-0.02em',
-            margin: 0,
-          }}
-        >
-          <IconBolt size={32} /> {balance} Coins
-        </h1>
-
-        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-          <Badge variant="accent">Instant Delivery</Badge>
-          <Badge variant="default">Non-Cashoutable</Badge>
-        </div>
-
-        <p style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)', margin: '4px 0 0' }}>
-          Use coins for gender filter matchmaking (1 coin) and sending in-call virtual gifts.
-        </p>
-      </Card>
 
       {/* Creator Earnings & Razorpay Instant UPI Withdrawal Card */}
       <Card
         style={{
-          padding: 'var(--space-20)',
+          padding: '16px',
           backgroundColor: 'var(--surface)',
-          border: '1px solid #1e2230',
+          borderTop: '1px solid #1e2230',
+          borderBottom: '1px solid #1e2230',
+          borderLeft: 'none',
+          borderRight: 'none',
+          borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
@@ -440,7 +411,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
             <span style={{ fontSize: 'var(--step-small)', fontWeight: 600, color: 'var(--ink)' }}>
               Instant Withdrawal via Razorpay
             </span>
-            {earningsInr > 0 && (
+            {earningsInr >= 500 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -469,13 +440,13 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
               </span>
               <input
                 type="number"
-                min="1"
+                min="500"
                 step="0.01"
                 max={earningsInr}
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder={earningsInr > 0 ? earningsInr.toFixed(2) : '0.00'}
-                disabled={earningsInr <= 0 || isWithdrawing}
+                placeholder={earningsInr >= 500 ? earningsInr.toFixed(2) : 'Min ₹500.00'}
+                disabled={earningsInr < 500 || isWithdrawing}
                 style={{
                   width: '100%',
                   backgroundColor: '#13161c',
@@ -492,22 +463,47 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
             <Button
               variant="primary"
               size="sm"
-              disabled={earningsInr <= 0 || !upiId || isWithdrawing}
+              disabled={earningsInr < 500 || !upiId || isWithdrawing}
               onClick={handleWithdraw}
               style={{
                 flex: '1 1 160px',
-                backgroundColor: earningsInr > 0 && upiId ? 'var(--accent)' : undefined,
+                backgroundColor: earningsInr >= 500 && upiId ? 'var(--accent)' : undefined,
                 whiteSpace: 'nowrap',
               }}
             >
-              {isWithdrawing ? 'Processing Payout...' : 'Withdraw to UPI'}
+              {isWithdrawing
+                ? 'Processing Payout...'
+                : earningsInr < 500
+                ? 'Min ₹500 to Withdraw'
+                : 'Withdraw to UPI'}
             </Button>
           </div>
+
+          {earningsInr < 500 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '11px',
+                color: 'var(--ink-secondary)',
+                backgroundColor: '#13161c',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid #232734',
+              }}
+            >
+              <span>Instant withdrawal threshold: <strong>₹500.00</strong></span>
+              <span style={{ color: '#f59e0b', fontWeight: 600 }}>
+                ₹{(500 - earningsInr).toFixed(2)} more needed
+              </span>
+            </div>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#f59e0b' }}>
             <IconShield size={13} color="#f59e0b" />
             <span>
-              Policy: Only coins received as virtual gifts from other users can be withdrawn. Purchased Donkey Play coins are non-cashoutable.
+              Policy: Only coins received as virtual gifts from other users can be withdrawn (min ₹500). Purchased Telegle coins are non-cashoutable.
             </span>
           </div>
 
@@ -516,8 +512,8 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
             <span>
               {!upiId
                 ? 'Link your UPI ID using the Edit button above to enable instant withdrawals.'
-                : earningsInr <= 0
-                ? 'Receive virtual gifts during video chats to earn withdrawable balance.'
+                : earningsInr < 500
+                ? 'Receive virtual gifts during video chats to reach the ₹500 minimum threshold.'
                 : 'Payouts are disbursed immediately via Razorpay Payouts directly to your linked UPI address.'}
             </span>
           </div>
@@ -525,7 +521,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
       </Card>
 
       {/* Recharge Packages Grid */}
-      <div>
+      <div style={{ padding: '0 16px' }}>
         <h2
           style={{
             fontSize: 'var(--step-lead)',
@@ -584,7 +580,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
                   color: 'var(--ink)',
                 }}
               >
-                <IconBolt size={18} /> {pkg.totalCoins}
+                <IconDollar size={18} color="#22c55e" /> {pkg.totalCoins}
               </strong>
               <span style={{ fontSize: 'var(--step-small)', color: 'var(--ink-secondary)' }}>
                 Coins
@@ -605,7 +601,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
       </div>
 
       {/* Recent Ledger Transactions */}
-      <div>
+      <div style={{ padding: '0 16px' }}>
         <h3
           style={{
             fontSize: 'var(--step-body)',
@@ -618,13 +614,13 @@ export const WalletView: React.FC<WalletViewProps> = ({ coins: propCoins, onAddC
         >
           <IconClock size={16} /> Recent Transactions
         </h3>
-        {transactions.length === 0 ? (
+        {(transactions || []).length === 0 ? (
           <Card style={{ padding: 'var(--space-16)', textAlign: 'center', color: 'var(--ink-secondary)' }}>
             No recent transactions yet
           </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {transactions.map((tx) => (
+            {(transactions || []).map((tx) => (
               <div
                 key={tx.id}
                 style={{

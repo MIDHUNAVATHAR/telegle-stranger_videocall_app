@@ -23,7 +23,7 @@ export class AuthController {
     res.cookie('dp_access_token', tokens.accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'strict',
+      sameSite: isProd ? 'none' : 'lax',
       path: '/',
       maxAge: 15 * 60 * 1000, // 15 mins
     });
@@ -31,15 +31,18 @@ export class AuthController {
     res.cookie('dp_refresh_token', tokens.refreshToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'strict',
-      path: '/api/v1/auth',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: isProd ? 'none' : 'lax',
+      path: '/',
+      maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
     });
   }
 
   private clearAuthCookies(res: Response): void {
-    res.clearCookie('dp_access_token', { path: '/' });
-    res.clearCookie('dp_refresh_token', { path: '/api/v1/auth' });
+    const isProd = env.NODE_ENV === 'production';
+    const sameSite = isProd ? 'none' : 'lax';
+    res.clearCookie('dp_access_token', { path: '/', sameSite, secure: isProd });
+    res.clearCookie('dp_refresh_token', { path: '/', sameSite, secure: isProd });
+    res.clearCookie('dp_refresh_token', { path: '/api/v1/auth', sameSite, secure: isProd });
   }
 
   private formatUser(user: User): Record<string, unknown> {
@@ -82,6 +85,7 @@ export class AuthController {
       const result = await this.verifyOtpUseCase.execute({
         email: req.body.email,
         code: req.body.code,
+        referralCode: req.body.referral_code || req.body.referralCode,
       });
 
       this.setAuthCookies(res, result.tokens);
@@ -93,6 +97,7 @@ export class AuthController {
           is_new_user: result.isNewUser,
           tokens: {
             access_token: result.tokens.accessToken,
+            refresh_token: result.tokens.refreshToken,
           },
         },
       });
@@ -105,6 +110,7 @@ export class AuthController {
     try {
       const result = await this.googleAuthUseCase.execute({
         idToken: req.body.id_token,
+        referralCode: req.body.referral_code || req.body.referralCode,
       });
 
       this.setAuthCookies(res, result.tokens);
@@ -116,6 +122,7 @@ export class AuthController {
           is_new_user: result.isNewUser,
           tokens: {
             access_token: result.tokens.accessToken,
+            refresh_token: result.tokens.refreshToken,
           },
         },
       });
@@ -139,6 +146,7 @@ export class AuthController {
           user: this.formatUser(result.user),
           tokens: {
             access_token: result.tokens.accessToken,
+            refresh_token: result.tokens.refreshToken,
           },
         },
       });

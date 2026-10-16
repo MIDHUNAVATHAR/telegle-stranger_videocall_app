@@ -112,6 +112,37 @@ describe('Phase 2: Authentication Module (Email OTP & Google Auth)', () => {
       expect(loginRes.body.data.user.id).toBe(verifyRes.body.data.user.id);
     });
 
+    it('rewards 10 coins to referrer when newly registered user signs up with referral code', async () => {
+      // 1. Create referrer
+      const referrer = User.create({
+        email: 'referrer@example.com',
+        username: 'top_referrer',
+        displayName: 'Top Referrer',
+        age: 22,
+      });
+      await repository.save(referrer);
+
+      // 2. New user signs up with referralCode: 'top_referrer'
+      const newEmail = 'invited.user@example.com';
+      const otp = await otpService.generateAndStoreOtp(newEmail, '127.0.0.1');
+
+      const res = await request(app)
+        .post('/api/v1/auth/otp/verify')
+        .send({ email: newEmail, code: otp, referral_code: 'top_referrer' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.is_new_user).toBe(true);
+      const newUserId = res.body.data.user.id;
+
+      // 3. Verify only referrer received 10 coins, new user has 0
+      const { walletRepository } = await import('../../src/modules/wallet');
+      const referrerWallet = await walletRepository.createOrGet(referrer.id);
+      const newUserWallet = await walletRepository.createOrGet(newUserId);
+
+      expect(referrerWallet.purchasedCoinsBalance).toBe(10);
+      expect(newUserWallet.purchasedCoinsBalance).toBe(0);
+    });
+
     it('rejects incorrect OTP and counts down retry attempts up to 3', async () => {
       const email = 'retry.test@example.com';
       await otpService.generateAndStoreOtp(email, '127.0.0.1');
@@ -202,6 +233,38 @@ describe('Phase 2: Authentication Module (Email OTP & Google Auth)', () => {
 
     it('rejects unauthenticated requests with 401 Unauthorized', async () => {
       const res = await request(app).get('/api/v1/auth/me');
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHORIZED');
+    });
+  });
+
+  describe('POST /api/v1/auth/refresh', () => {
+    it('accepts 14-day refresh token cookie, rotates it, and issues new 15m access token & 14d refresh token', async () => {
+      const user = User.create({ email: 'refresh.test@example.com' });
+      await repository.save(user);
+
+      const initialTokens = tokenService.generateTokens(user);
+
+      const res = await request(app)
+        .post('/api/v1/auth/refresh')
+        .set('Cookie', [`dp_refresh_token=${initialTokens.refreshToken}`]);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user.email).toBe('refresh.test@example.com');
+      expect(res.body.data.tokens.access_token).toBeDefined();
+      expect(res.body.data.tokens.refresh_token).toBeDefined();
+
+      // Check rotated cookies
+      const cookies = res.headers['set-cookie'] as unknown as string[];
+      expect(cookies.some((c) => c.includes('dp_access_token='))).toBe(true);
+      expect(cookies.some((c) => c.includes('dp_refresh_token='))).toBe(true);
+      // Verify 14-day Max-Age (1209600s) on refresh token cookie
+      expect(cookies.some((c) => c.includes('Max-Age=1209600'))).toBe(true);
+    });
+
+    it('rejects missing or invalid refresh token with 401', async () => {
+      const res = await request(app).post('/api/v1/auth/refresh');
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe('UNAUTHORIZED');
     });

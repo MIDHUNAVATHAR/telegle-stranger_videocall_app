@@ -109,8 +109,10 @@ describe('Phase 6: In-Call Chat & Messages Inbox Module', () => {
   });
 
   describe('POST /api/v1/conversations/:id/call (Direct Call Reconnection)', () => {
-    it('initiates direct call when partner allows incoming calls', async () => {
+    it('initiates direct call when partner has enabled video call', async () => {
       const conv = Conversation.create(userA.id, userB.id);
+      // Partner (userB) enables video call for userA
+      conv.setVideoCallEnabled(userB.id, true);
       await convRepo.save(conv);
 
       const res = await request(app)
@@ -123,8 +125,23 @@ describe('Phase 6: In-Call Chat & Messages Inbox Module', () => {
       expect(res.body.data.session_id).toBeDefined();
     });
 
+    it('rejects direct call with 403 when partner has not enabled video call for this conversation', async () => {
+      const conv = Conversation.create(userA.id, userB.id);
+      // Default: video call is not enabled by userB
+      await convRepo.save(conv);
+
+      const res = await request(app)
+        .post(`/api/v1/conversations/${conv.id}/call`)
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('DIRECT_CALL_NOT_ALLOWED');
+      expect(res.body.error.message).toContain('Video call is not enabled by partner');
+    });
+
     it('rejects direct call with 403 when partner disabled incoming calls in preferences', async () => {
       const conv = Conversation.create(userA.id, userB.id);
+      conv.setVideoCallEnabled(userB.id, true);
       await convRepo.save(conv);
 
       // David turns off direct incoming calls in his preferences
@@ -138,6 +155,45 @@ describe('Phase 6: In-Call Chat & Messages Inbox Module', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('DIRECT_CALL_NOT_ALLOWED');
+    });
+  });
+
+  describe('PATCH /api/v1/conversations/:id/video-call (Per-User Video Call Toggle)', () => {
+    it('allows a user to enable and disable video call for their conversation partner', async () => {
+      const conv = Conversation.create(userA.id, userB.id);
+      await convRepo.save(conv);
+
+      // 1. Initially disabled for both
+      const listA = await request(app)
+        .get('/api/v1/conversations')
+        .set('Authorization', `Bearer ${tokenA}`);
+      expect(listA.body.data[0].video_call_enabled_by_me).toBe(false);
+      expect(listA.body.data[0].video_call_enabled_by_partner).toBe(false);
+
+      // 2. User B enables video call
+      const toggleResB = await request(app)
+        .patch(`/api/v1/conversations/${conv.id}/video-call`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ enabled: true });
+
+      expect(toggleResB.status).toBe(200);
+      expect(toggleResB.body.success).toBe(true);
+      expect(toggleResB.body.data.video_call_enabled_by_me).toBe(true);
+      expect(toggleResB.body.data.video_call_enabled_by_partner).toBe(false);
+
+      // 3. User A now sees partner enabled video call!
+      const listAAfterB = await request(app)
+        .get('/api/v1/conversations')
+        .set('Authorization', `Bearer ${tokenA}`);
+      expect(listAAfterB.body.data[0].video_call_enabled_by_partner).toBe(true);
+      expect(listAAfterB.body.data[0].video_call_enabled_by_me).toBe(false);
+
+      // 4. Now user A can initiate direct call
+      const callRes = await request(app)
+        .post(`/api/v1/conversations/${conv.id}/call`)
+        .set('Authorization', `Bearer ${tokenA}`);
+      expect(callRes.status).toBe(200);
+      expect(callRes.body.data.status).toBe('RINGING');
     });
   });
 });

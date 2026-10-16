@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IWalletDocument extends Document {
-  user_id: Types.ObjectId;
+  user_id: Types.ObjectId | string;
   purchased_coins_balance: number;
   withdrawable_earnings_paise: number;
   total_coins_spent: number;
@@ -13,8 +13,8 @@ export interface IWalletDocument extends Document {
 }
 
 export interface IWalletTransactionDocument extends Document {
-  wallet_id: Types.ObjectId;
-  user_id: Types.ObjectId;
+  wallet_id: Types.ObjectId | string;
+  user_id: Types.ObjectId | string;
   type: string;
   coins_amount: number;
   currency_amount_paise: number;
@@ -33,7 +33,7 @@ export interface IWalletTransactionDocument extends Document {
 
 const WalletSchema = new Schema<IWalletDocument>(
   {
-    user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    user_id: { type: Schema.Types.Mixed, required: true, unique: true },
     purchased_coins_balance: { type: Number, required: true, default: 0, min: 0 },
     withdrawable_earnings_paise: { type: Number, required: true, default: 0, min: 0 },
     total_coins_spent: { type: Number, required: true, default: 0, min: 0 },
@@ -48,8 +48,8 @@ const WalletSchema = new Schema<IWalletDocument>(
 
 const WalletTransactionSchema = new Schema<IWalletTransactionDocument>(
   {
-    wallet_id: { type: Schema.Types.ObjectId, ref: 'Wallet', required: true, index: true },
-    user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    wallet_id: { type: Schema.Types.Mixed, required: true, index: true },
+    user_id: { type: Schema.Types.Mixed, required: true, index: true },
     type: {
       type: String,
       required: true,

@@ -44,9 +44,31 @@ export class MongooseUserRepository implements UserRepository {
     return count > 0;
   }
 
-  public async existsByUsername(username: string): Promise<boolean> {
-    const count = await this.model.countDocuments({ username }).exec();
+  public async existsByUsername(username: string, excludeUserId?: string): Promise<boolean> {
+    const clean = username.trim();
+    const filter: Record<string, any> = {
+      username: { $regex: new RegExp(`^${clean}$`, 'i') },
+    };
+    if (excludeUserId) {
+      filter.userId = { $ne: excludeUserId };
+    }
+    const count = await this.model.countDocuments(filter).exec();
     return count > 0;
+  }
+
+  public async searchByUsername(query: string, excludeUserId?: string): Promise<User[]> {
+    const cleanQuery = query.trim().replace(/^@/, '');
+    if (!cleanQuery) return [];
+    const escaped = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const filter: Record<string, any> = {
+      username: { $regex: new RegExp(escaped, 'i') },
+      isBanned: false,
+    };
+    if (excludeUserId) {
+      filter.userId = { $ne: excludeUserId };
+    }
+    const docs = await this.model.find(filter).limit(10).exec();
+    return docs.map((doc) => UserMapper.toDomain(doc));
   }
 
   public async save(user: User): Promise<User> {

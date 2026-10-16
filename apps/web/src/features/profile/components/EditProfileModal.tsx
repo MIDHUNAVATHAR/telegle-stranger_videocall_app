@@ -9,13 +9,15 @@ interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialProfile: {
-    displayName: string;
+    username?: string;
+    displayName?: string;
     bio?: string;
     gender?: string;
     age?: number;
     avatarUrl?: string;
   };
   onProfileUpdated: (updated: {
+    username: string;
     displayName: string;
     gender: string;
     age: number;
@@ -29,7 +31,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   initialProfile,
   onProfileUpdated,
 }) => {
-  const [displayName, setDisplayName] = useState(initialProfile.displayName || '');
+  const [username, setUsername] = useState(
+    initialProfile.username || initialProfile.displayName || ''
+  );
   const [gender, setGender] = useState(initialProfile.gender || 'OTHER');
   const [age, setAge] = useState<number>(initialProfile.age || 18);
   const [avatarUrl, setAvatarUrl] = useState(initialProfile.avatarUrl || '');
@@ -71,13 +75,20 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!displayName.trim()) {
-      setErrorMessage('Display name is required');
+    const cleanUsername = username.trim().replace(/^@/, '');
+    if (!cleanUsername) {
+      setErrorMessage('Username is required');
+      return;
+    }
+
+    const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+    if (!usernameRegex.test(cleanUsername)) {
+      setErrorMessage('Username must be 3-30 characters (letters, numbers, and underscores only)');
       return;
     }
 
     if (age < 18) {
-      setErrorMessage('You must be 18 or older to use Donkey Play');
+      setErrorMessage('You must be 18 or older to use Telegle');
       return;
     }
 
@@ -85,7 +96,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
     try {
       const payload: UpdateProfilePayload = {
-        display_name: displayName.trim(),
+        username: cleanUsername,
+        display_name: cleanUsername,
         gender,
         age: Number(age),
         avatar_url: avatarUrl || undefined,
@@ -93,15 +105,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
       await profileApi.updateProfile(payload);
       onProfileUpdated({
-        displayName: displayName.trim(),
+        username: cleanUsername,
+        displayName: cleanUsername,
         gender,
         age: Number(age),
         avatarUrl,
       });
       onClose();
     } catch (err: unknown) {
-      const errObj = err as Error;
-      setErrorMessage(errObj.message || 'Failed to update profile');
+      const errObj = err as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      const msg = errObj?.response?.data?.error?.message || errObj?.message || 'Failed to update profile';
+      setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -127,18 +141,36 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
         {/* Avatar Upload */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-          <div style={{ position: 'relative', width: '84px', height: '84px' }}>
-            <img
-              src={avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
-              alt="Avatar preview"
+          <div style={{ position: 'relative', width: '84px', height: '84px', minWidth: '84px', minHeight: '84px', flexShrink: 0 }}>
+            <div
               style={{
-                width: '100%',
-                height: '100%',
+                width: '84px',
+                height: '84px',
+                minWidth: '84px',
+                minHeight: '84px',
                 borderRadius: '50%',
-                objectFit: 'cover',
+                overflow: 'hidden',
                 border: '2px solid var(--accent)',
+                backgroundColor: 'var(--surface)',
+                boxSizing: 'border-box',
               }}
-            />
+            >
+              <img
+                src={avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+                alt="Avatar preview"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80';
+                }}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  aspectRatio: '1 / 1',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+            </div>
             {isUploading && (
               <div
                 style={{
@@ -177,27 +209,47 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           </Button>
         </div>
 
-        {/* Display Name */}
+        {/* Username */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-            Display Name
+            Username
           </label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            maxLength={50}
-            required
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              backgroundColor: 'var(--surface-raised)',
-              border: '1px solid #2a3042',
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--ink)',
-              fontSize: '14px',
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            <span
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--accent)',
+                fontWeight: 700,
+                fontSize: '14px',
+              }}
+            >
+              @
+            </span>
+            <input
+              type="text"
+              value={username.replace(/^@/, '')}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              placeholder="unique_username"
+              maxLength={30}
+              required
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '10px 14px 10px 30px',
+                backgroundColor: 'var(--surface-raised)',
+                border: '1px solid #2a3042',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--ink)',
+                fontSize: '14px',
+              }}
+            />
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--ink-secondary)', marginTop: '4px', display: 'block' }}>
+            Unique handle across Telegle. 3–30 characters, letters, numbers, and underscores.
+          </span>
         </div>
 
         {/* Age and Gender */}

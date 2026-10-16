@@ -25,12 +25,9 @@ export const walletApi = {
     }>('/wallet/orders/verify', params),
 
   getTransactions: (page = 1, limit = 10) =>
-    api.get<{
-      transactions: IWalletTransaction[];
-      total: number;
-      page: number;
-      limit: number;
-    }>(`/wallet/transactions?page=${page}&limit=${limit}`),
+    api.get<IWalletTransaction[] | { transactions: IWalletTransaction[]; total: number; page: number; limit: number }>(
+      `/wallet/transactions?page=${page}&limit=${limit}`
+    ),
 
   updateUpiId: (upiId: string) =>
     api.put<{ upiId: string }>('/wallet/upi', { upiId }),

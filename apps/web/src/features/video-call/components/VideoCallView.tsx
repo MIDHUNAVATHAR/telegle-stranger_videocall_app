@@ -14,13 +14,14 @@ import {
   IconLock,
 } from '../../../shared/components/Icons';
 import { Stranger, ChatMessage } from '../../../shared/types';
+import { DEFAULT_AVATAR, getSafeAvatarUrl } from '../../../shared/constants';
 import { useWebRTC } from '../hooks/useWebRTC';
 
 interface VideoCallViewProps {
   stranger: Stranger | null;
   sessionId?: string;
   isInitiator?: boolean;
-  onNextStranger: () => void;
+  onNextStranger: (reason?: string) => void;
   onOpenGiftModal: () => void;
   onOpenReportModal: () => void;
   onToggleChat?: () => void;
@@ -158,8 +159,8 @@ InCallChatBar.displayName = 'InCallChatBar';
 
 export const VideoCallView: React.FC<VideoCallViewProps> = ({
   stranger,
-  sessionId = 'sess_demo_live',
-  isInitiator = true,
+  sessionId,
+  isInitiator = false,
   onNextStranger,
   onOpenGiftModal,
   onOpenReportModal,
@@ -167,9 +168,23 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
   onSendMessage,
 }) => {
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
+  const [peerLeftNotification, setPeerLeftNotification] = useState<{
+    show: boolean;
+    name: string;
+  } | null>(null);
   const [localMessages, setLocalMessages] = useState<
     { id: string; sender: string; text: string; isSelf: boolean }[]
   >([]);
+
+  const handleCallEnded = React.useCallback((reason?: string) => {
+    setPeerLeftNotification({
+      show: true,
+      name: stranger?.name || 'Stranger',
+    });
+    setTimeout(() => {
+      onNextStranger?.(reason || 'PEER_LEFT');
+    }, 1800);
+  }, [stranger?.name, onNextStranger]);
 
   const {
     localStream,
@@ -183,7 +198,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
   } = useWebRTC({
     sessionId,
     isInitiator,
-    onCallEnded: onNextStranger,
+    onCallEnded: handleCallEnded,
   });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -195,14 +210,16 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
       if (localVideoRef.current.srcObject !== localStream) {
         localVideoRef.current.srcObject = localStream;
       }
+      if (!isVideoOff) {
+        localVideoRef.current.play().catch(() => {});
+      }
     }
-  }, [localStream]);
+  }, [localStream, isVideoOff]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      if (remoteVideoRef.current.srcObject !== remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
     }
   }, [remoteStream]);
 
@@ -288,7 +305,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
         <p style={{ color: 'var(--ink-secondary)', fontSize: 'var(--step-body)' }}>
           Hop into Discovery to connect with an active stranger in seconds.
         </p>
-        <Button variant="primary" size="lg" onClick={onNextStranger}>
+        <Button variant="primary" size="lg" onClick={() => onNextStranger()}>
           Find Stranger
         </Button>
       </div>
@@ -323,7 +340,13 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
       >
         {remoteStream ? (
           <video
-            ref={remoteVideoRef}
+            ref={(el) => {
+              remoteVideoRef.current = el;
+              if (el && remoteStream && el.srcObject !== remoteStream) {
+                el.srcObject = remoteStream;
+                el.play().catch(() => {});
+              }
+            }}
             autoPlay
             playsInline
             style={{
@@ -334,7 +357,7 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
           />
         ) : (
           <img
-            src={stranger.avatar || '/logo.png'}
+            src={getSafeAvatarUrl(stranger.avatar, stranger.gender)}
             alt=""
             style={{
               width: '100%',
@@ -342,11 +365,62 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
               objectFit: 'cover',
             }}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/logo.png';
+              (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
             }}
           />
         )}
       </div>
+
+      {/* Attractive Peer Left Toast Banner */}
+      {peerLeftNotification && (
+        <div
+          role="alert"
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            width: 'calc(100% - 32px)',
+            maxWidth: '420px',
+            backgroundColor: 'rgba(21, 24, 33, 0.95)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: '1.5px solid #f59e0b',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(245, 158, 11, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            animation: 'callModalPop 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(245, 158, 11, 0.16)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              fontSize: '22px',
+            }}
+          >
+            👋
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em' }}>
+              {peerLeftNotification.name} left the video call
+            </h4>
+            <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: 'var(--ink-secondary)', fontWeight: 500 }}>
+              The other user ended the chat. Returning to match...
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 2. Top-Left: Clean Call Duration Timer (No WebRTC P2P text) */}
       <div
@@ -432,6 +506,28 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
           zIndex: 60,
         }}
       >
+        {/* Local Video element: Kept mounted in DOM so srcObject is preserved across mute/unmute */}
+        <video
+          ref={(el) => {
+            localVideoRef.current = el;
+            if (el && localStream && el.srcObject !== localStream) {
+              el.srcObject = localStream;
+            }
+            if (el && !isVideoOff) {
+              el.play().catch(() => {});
+            }
+          }}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: isVideoOff || !localStream ? 'none' : 'block',
+          }}
+        />
+
         {isVideoOff ? (
           <span
             style={{
@@ -443,21 +539,13 @@ export const VideoCallView: React.FC<VideoCallViewProps> = ({
           >
             Camera Off
           </span>
-        ) : localStream ? (
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
+        ) : !localStream ? (
           <img
             src="/logo.png"
             alt="You"
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
-        )}
+        ) : null}
         <span
           style={{
             position: 'absolute',

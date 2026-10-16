@@ -35,6 +35,44 @@ export const IconBolt: React.FC<IconProps> = ({ size = 20, ...props }) => (
   </svg>
 );
 
+export const IconDollar: React.FC<IconProps> = ({ size = 20, color = '#22c55e', ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <circle cx="12" cy="12" r="10" stroke={color} fill="rgba(34, 197, 94, 0.14)" />
+    <path d="M12 6v12" stroke={color} strokeWidth="2.2" />
+    <path d="M15 9.5a2.5 2.5 0 0 0-2.5-2h-1a2.5 2.5 0 0 0 0 5h1a2.5 2.5 0 0 1 0 5h-1a2.5 2.5 0 0 1-2.5-2" stroke={color} strokeWidth="2.2" />
+  </svg>
+);
+
+export const IconCash: React.FC<IconProps> = ({ size = 20, color = '#22c55e', ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <rect x="2" y="6" width="20" height="12" rx="2" stroke={color} fill="rgba(34, 197, 94, 0.12)" />
+    <circle cx="12" cy="12" r="3" stroke={color} />
+    <path d="M6 12h.01M18 12h.01" stroke={color} />
+  </svg>
+);
+
 export const IconCompass: React.FC<IconProps> = ({ size = 20, ...props }) => (
   <svg
     width={size}
@@ -299,6 +337,41 @@ export const IconClock: React.FC<IconProps> = ({ size = 20, ...props }) => (
   >
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+export const IconCopy: React.FC<IconProps> = ({ size = 20, ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+export const IconCheck: React.FC<IconProps> = ({ size = 20, ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 

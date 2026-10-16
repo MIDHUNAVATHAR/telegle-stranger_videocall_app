@@ -311,7 +311,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               onClose();
             }}
           >
-            Sign Out of Donkey Play
+            Sign Out of Telegle
           </Button>
         )}
 

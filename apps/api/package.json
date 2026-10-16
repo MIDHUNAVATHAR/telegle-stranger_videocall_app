@@ -15,6 +15,7 @@
     "@donkey-play/validation": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "dotenv": "^18.0.7",
     "express": "^4.21.2",
     "express-rate-limit": "^8.7.1",
     "google-auth-library": "^11.3.0",

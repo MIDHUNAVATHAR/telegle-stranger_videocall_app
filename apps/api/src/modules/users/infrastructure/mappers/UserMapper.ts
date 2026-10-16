@@ -11,7 +11,12 @@ export class UserMapper {
       googleId: doc.googleId,
       age: doc.age || 18,
       gender: (doc.gender as UserGender) || 'PREFER_NOT_TO_SAY',
-      avatarUrl: doc.avatarUrl || '',
+      avatarUrl:
+        doc.avatarUrl && !doc.avatarUrl.startsWith('blob:') && doc.avatarUrl !== '/logo.png'
+          ? doc.avatarUrl
+          : doc.gender === 'MALE'
+          ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=480&q=80'
+          : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=480&q=80',
       bio: doc.bio || '',
       role: (doc.role as UserRole) || 'USER',
       isBanned: doc.isBanned || false,

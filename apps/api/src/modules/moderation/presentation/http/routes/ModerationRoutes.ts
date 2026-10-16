@@ -10,6 +10,7 @@ export const createModerationRouter = (controller: ModerationController): Router
   router.post('/blocks', authMiddleware, controller.blockUser);
   router.delete('/blocks/:targetUserId', authMiddleware, controller.unblockUser);
   router.get('/blocks', authMiddleware, controller.listBlocks);
+  router.get('/status/:targetUserId', authMiddleware, controller.checkBlockStatus);
 
   return router;
 };

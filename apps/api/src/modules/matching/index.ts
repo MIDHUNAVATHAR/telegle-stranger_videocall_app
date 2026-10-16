@@ -9,11 +9,14 @@ import { LeaveQueueUseCase } from './application/use-cases/LeaveQueueUseCase';
 import { GetCallSessionUseCase, EndCallSessionUseCase } from './application/use-cases/CallSessionUseCases';
 import { MatchingController } from './presentation/http/controllers/MatchingController';
 import { createMatchingRouter, createCallsRouter } from './presentation/http/routes/MatchingRoutes';
+import { IWalletRepository } from '../wallet/domain/repositories/WalletRepository';
+import { getRedisClient } from '../../config/redis';
 
 export interface MatchingModuleOptions {
   userRepository?: UserRepository;
   presenceService?: PresenceService;
   matchmakingService?: MatchmakingService;
+  walletRepository?: IWalletRepository;
 }
 
 export interface MatchingModule {
@@ -36,10 +39,10 @@ export interface MatchingModule {
 export const createMatchingModule = (options: MatchingModuleOptions = {}): MatchingModule => {
   const userRepository = options.userRepository ?? new MongooseUserRepository();
   const presence = options.presenceService ?? new PresenceService();
-  const matchmaking = options.matchmakingService ?? new MatchmakingService();
+  const matchmaking = options.matchmakingService ?? new MatchmakingService(getRedisClient(), options.walletRepository);
 
   const getOnlinePresence = new GetOnlinePresenceUseCase(presence);
-  const joinQueue = new JoinQueueUseCase(matchmaking, userRepository);
+  const joinQueue = new JoinQueueUseCase(matchmaking, userRepository, options.walletRepository);
   const leaveQueue = new LeaveQueueUseCase(matchmaking);
   const getCallSession = new GetCallSessionUseCase(matchmaking);
   const endCallSession = new EndCallSessionUseCase(matchmaking);

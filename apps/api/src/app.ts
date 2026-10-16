@@ -12,7 +12,7 @@ import { createUsersModule, UserRepository } from './modules/users';
 import { createAuthModule, RedisOtpService, JwtTokenService } from './modules/auth';
 import { createMatchingModule, PresenceService, MatchmakingService } from './modules/matching';
 import { createConversationsModule, ConversationRepository } from './modules/conversations';
-import { walletRouter, IWalletRepository } from './modules/wallet';
+import { walletRouter, walletRepository, IWalletRepository } from './modules/wallet';
 import { giftRouter } from './modules/gifts';
 import { createModerationModule, IModerationRepository } from './modules/moderation';
 
@@ -84,6 +84,7 @@ export const createApp = (options: AppOptions = {}): Application => {
     userRepository: options.userRepository,
     otpService: options.otpService,
     tokenService: options.tokenService,
+    walletRepository: options.walletRepository || walletRepository,
   });
   app.use(`${env.API_PREFIX}/auth`, authModule.router);
 
@@ -94,6 +95,7 @@ export const createApp = (options: AppOptions = {}): Application => {
     userRepository: options.userRepository,
     presenceService: options.presenceService,
     matchmakingService: options.matchmakingService,
+    walletRepository: options.walletRepository || walletRepository,
   });
   app.use(`${env.API_PREFIX}/matching`, matchingModule.matchingRouter);
   app.use(`${env.API_PREFIX}/calls`, matchingModule.callsRouter);

@@ -25,4 +25,18 @@ describe('Frontend Matching Module', () => {
     const res = await matchingApi.leaveQueue();
     expect(res.message).toBe('Left matchmaking queue successfully');
   });
+
+  it('handles getOnlinePresence returning exact counts including 0', async () => {
+    vi.spyOn(matchingApi, 'getOnlinePresence').mockResolvedValueOnce({
+      online_count: 0,
+    });
+    const zeroRes = await matchingApi.getOnlinePresence();
+    expect(zeroRes.online_count).toBe(0);
+
+    vi.spyOn(matchingApi, 'getOnlinePresence').mockResolvedValueOnce({
+      online_count: 5,
+    });
+    const activeRes = await matchingApi.getOnlinePresence();
+    expect(activeRes.online_count).toBe(5);
+  });
 });

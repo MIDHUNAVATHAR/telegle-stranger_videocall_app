@@ -19,21 +19,33 @@ export interface UserProfile {
 export interface AuthResponse {
   user: UserProfile;
   is_new_user: boolean;
+  tokens?: {
+    access_token: string;
+    refresh_token?: string;
+  };
+}
+
+export interface RefreshResponse {
+  user: UserProfile;
+  tokens: {
+    access_token: string;
+    refresh_token?: string;
+  };
 }
 
 export const authApi = {
   sendOtp: (email: string) =>
     api.post<{ message: string; expiresIn: number }>('/auth/otp/send', { email }),
 
-  verifyOtp: (email: string, code: string) =>
-    api.post<AuthResponse>('/auth/otp/verify', { email, code }),
+  verifyOtp: (email: string, code: string, referralCode?: string) =>
+    api.post<AuthResponse>('/auth/otp/verify', { email, code, referral_code: referralCode }),
 
-  googleAuth: (idToken: string) =>
-    api.post<AuthResponse>('/auth/google', { id_token: idToken }),
+  googleAuth: (idToken: string, referralCode?: string) =>
+    api.post<AuthResponse>('/auth/google', { id_token: idToken, referral_code: referralCode }),
 
   getMe: () => api.get<UserProfile>('/auth/me'),
 
-  refreshToken: () => api.post<{ user: UserProfile }>('/auth/refresh'),
+  refreshToken: () => api.post<RefreshResponse>('/auth/refresh'),
 
   logout: () => api.post<{ message: string }>('/auth/logout'),
 };

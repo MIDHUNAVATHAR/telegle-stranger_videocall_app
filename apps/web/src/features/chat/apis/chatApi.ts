@@ -9,6 +9,7 @@ export interface PublicPartner {
   gender: string;
   age: number;
   karmaScore: number;
+  is_online?: boolean;
 }
 
 export interface ConversationItem {
@@ -16,6 +17,10 @@ export interface ConversationItem {
   id: string;
   partner: PublicPartner;
   last_interaction_at: string;
+  last_message_text?: string;
+  last_message_sender_id?: string;
+  video_call_enabled_by_partner?: boolean;
+  video_call_enabled_by_me?: boolean;
 }
 
 export interface DirectCallResponse {
@@ -35,4 +40,10 @@ export const chatApi = {
 
   directCall: (id: string) =>
     api.post<DirectCallResponse>(`/conversations/${id}/call`),
+
+  toggleVideoCallPermission: (id: string, enabled: boolean) =>
+    api.patch<ConversationItem>(`/conversations/${id}/video-call`, { enabled }),
+
+  createOrEnsureConversation: (partnerId: string, matchId?: string, lastMessageText?: string) =>
+    api.post<ConversationItem>('/conversations', { partnerId, matchId, lastMessageText }),
 };

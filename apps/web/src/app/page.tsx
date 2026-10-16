@@ -17,10 +17,10 @@ export default function HomePage() {
           border: 0,
         }}
       >
-        Donkey Play — Free Live Random Video Chat & Stranger Video Calls | Top Omegle Alternative
+        Telegle — Meet Strangers. Make Connections | Free Live Random Video Chat
       </h1>
       <section
-        aria-label="About Donkey Play Random Video Chat"
+        aria-label="About Telegle Random Video Chat"
         style={{
           position: 'absolute',
           width: '1px',
@@ -34,7 +34,7 @@ export default function HomePage() {
         }}
       >
         <p>
-          Donkey Play is the premier free online random video chat and stranger chat platform. Meet new friends and connect with verified strangers worldwide in live 1-on-1 video calls. The safest Omegle alternative with strict moderation, no nudity, and instant video roulette matchmaking.
+          Telegle is the premier free online random video chat and stranger chat platform. Meet Strangers. Make Connections. Meet new friends and connect with verified strangers worldwide in live 1-on-1 video calls. The safest Omegle alternative with strict moderation, no nudity, and instant video roulette matchmaking.
         </p>
         <h2>Best Omegle Alternative for Random Video Calls and Stranger Chat</h2>
         <ul>

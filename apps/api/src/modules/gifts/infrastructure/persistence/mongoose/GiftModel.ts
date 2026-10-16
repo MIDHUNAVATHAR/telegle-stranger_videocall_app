@@ -15,10 +15,10 @@ export interface IGiftDocument extends Document {
 }
 
 export interface IGiftTransferDocument extends Document {
-  gift_id: Types.ObjectId;
-  sender_id: Types.ObjectId;
-  recipient_id: Types.ObjectId;
-  match_id?: Types.ObjectId;
+  gift_id: Types.ObjectId | string;
+  sender_id: Types.ObjectId | string;
+  recipient_id: Types.ObjectId | string;
+  match_id?: Types.ObjectId | string;
   coins_spent: number;
   creator_earnings_paise: number;
   platform_fee_paise: number;
@@ -44,10 +44,10 @@ const GiftSchema = new Schema<IGiftDocument>(
 
 const GiftTransferSchema = new Schema<IGiftTransferDocument>(
   {
-    gift_id: { type: Schema.Types.ObjectId, ref: 'Gift', required: true, index: true },
-    sender_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    recipient_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    match_id: { type: Schema.Types.ObjectId, ref: 'Match' },
+    gift_id: { type: Schema.Types.Mixed, required: true, index: true },
+    sender_id: { type: Schema.Types.Mixed, required: true, index: true },
+    recipient_id: { type: Schema.Types.Mixed, required: true, index: true },
+    match_id: { type: Schema.Types.Mixed },
     coins_spent: { type: Number, required: true },
     creator_earnings_paise: { type: Number, required: true },
     platform_fee_paise: { type: Number, required: true },

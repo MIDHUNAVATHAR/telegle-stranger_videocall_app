@@ -60,7 +60,7 @@ describe('Phase 8: Virtual Gifts & Coin Economy Module', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.length).toBe(4);
+      expect(res.body.data.length).toBe(12);
 
       const rose = res.body.data.find((g: any) => g.slug === 'rose-5c');
       expect(rose).toBeDefined();
@@ -144,5 +144,38 @@ describe('Phase 8: Virtual Gifts & Coin Economy Module', () => {
       expect(recipientBalRes.body.data.withdrawableEarningsPaise).toBe(700);
       expect(recipientBalRes.body.data.withdrawableEarningsInr).toBe(7);
     });
+
+    it('deducts configured platform_commision_gift percentage and adds remaining earnings to recipient wallet', async () => {
+      // 1. Credit sender with 100 coins
+      await walletRepository.creditCoins(
+        senderUser.id,
+        100,
+        'test_precredit_sender_commission',
+        'SYSTEM',
+        'admin_grant'
+      );
+
+      // 2. Sender sends a 5 coin gift (500 paise total value)
+      // With 30% platform commission: 150 paise platform fee, 350 paise to recipient
+      const sendRes = await request(app)
+        .post('/api/v1/gifts/send')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          giftSlug: 'rose-5c',
+          recipientUserId: recipientUser.id,
+        });
+
+      expect(sendRes.status).toBe(200);
+      expect(sendRes.body.data.gift.platformFeePaise).toBe(150);
+      expect(sendRes.body.data.gift.creatorEarningPaise).toBe(350);
+
+      // Verify recipient received net amount after commission deduction
+      const recipientBal = await request(app)
+        .get('/api/v1/wallet/balance')
+        .set('Authorization', `Bearer ${recipientToken}`);
+
+      expect(recipientBal.body.data.withdrawableEarningsPaise).toBe(350);
+    });
   });
 });
+

@@ -3,6 +3,14 @@ import { IGiftEntity, IGiftTransferEntity, SEED_GIFTS } from '../../../domain/en
 import { IGiftRepository } from '../../../domain/repositories/GiftRepository';
 import { GiftModel, GiftTransferModel, IGiftDocument, IGiftTransferDocument } from '../mongoose/GiftModel';
 
+function toDbId(id?: string): Types.ObjectId | string | undefined {
+  if (!id) return undefined;
+  if (Types.ObjectId.isValid(id) && id.length === 24 && !id.includes('-')) {
+    return new Types.ObjectId(id);
+  }
+  return id;
+}
+
 export class MongooseGiftRepository implements IGiftRepository {
   private inMemoryGifts = new Map<string, IGiftEntity>();
   private inMemoryTransfers: IGiftTransferEntity[] = [];
@@ -76,10 +84,10 @@ export class MongooseGiftRepository implements IGiftRepository {
   ): Promise<IGiftTransferEntity> {
     if (mongoose.connection.readyState === 1) {
       const doc = await GiftTransferModel.create({
-        gift_id: new Types.ObjectId(transfer.giftId),
-        sender_id: new Types.ObjectId(transfer.senderId),
-        recipient_id: new Types.ObjectId(transfer.recipientId),
-        match_id: transfer.matchSessionId ? new Types.ObjectId(transfer.matchSessionId) : undefined,
+        gift_id: toDbId(transfer.giftId),
+        sender_id: toDbId(transfer.senderId),
+        recipient_id: toDbId(transfer.recipientId),
+        match_id: toDbId(transfer.matchSessionId),
         coins_spent: transfer.coinsSpent,
         creator_earnings_paise: transfer.creatorEarningsPaise,
         platform_fee_paise: transfer.platformFeePaise,

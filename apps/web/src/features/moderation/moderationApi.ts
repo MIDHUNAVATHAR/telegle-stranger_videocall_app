@@ -21,4 +21,7 @@ export const moderationApi = {
 
   listBlocks: () =>
     api.get<Array<{ id: string; blockedUserId: string; createdAt: string }>>('/moderation/blocks'),
+
+  checkBlockStatus: (targetUserId: string) =>
+    api.get<{ isBlockedByMe: boolean; isBlockedByThem: boolean }>(`/moderation/status/${targetUserId}`),
 };

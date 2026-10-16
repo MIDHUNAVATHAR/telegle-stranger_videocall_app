@@ -15,23 +15,34 @@ export const POPULAR_INTERESTS = [
 
 export const AVAILABLE_GIFTS: VirtualGift[] = [
   { id: 'carrot', name: 'Golden Carrot', cost: 20, icon: 'CARROT', description: 'Fresh crisp crunch' },
-  { id: 'crown', name: 'Donkey Crown', cost: 100, icon: 'CROWN', description: 'King of the lobby' },
+  { id: 'crown', name: 'Telegle Crown', cost: 100, icon: 'CROWN', description: 'King of the lobby' },
   { id: 'taco', name: 'Spicy Taco', cost: 35, icon: 'TACO', description: 'Spice up the chat' },
   { id: 'diamond', name: 'Blue Diamond', cost: 250, icon: 'DIAMOND', description: 'Ultra prestige' },
   { id: 'rocket', name: 'Speed Rocket', cost: 500, icon: 'ROCKET', description: 'To the stratosphere' },
   { id: 'heart', name: 'Spark Heart', cost: 10, icon: 'HEART', description: 'Send good vibes' },
 ];
 
+export const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=480&q=80';
+export const DEFAULT_AVATAR_MALE = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=480&q=80';
+export const DEFAULT_AVATAR_FEMALE = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=480&q=80';
+
+export const getSafeAvatarUrl = (avatarUrl?: string | null, gender?: string): string => {
+  if (avatarUrl && !avatarUrl.startsWith('blob:') && avatarUrl !== '/logo.png') {
+    return avatarUrl;
+  }
+  return (gender || '').toUpperCase() === 'MALE' ? DEFAULT_AVATAR_MALE : DEFAULT_AVATAR_FEMALE;
+};
+
 export const INITIAL_USER = {
   id: 'usr_me_01',
-  name: 'Alex Rider',
-  tag: '@alex_play',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
-  coins: 420,
-  country: 'United States',
-  countryCode: 'US',
-  interests: ['Gaming', 'Anime', 'Music'],
-  bio: 'Just looking for funny random video chats and good banter.',
+  name: 'User',
+  tag: '',
+  avatar: DEFAULT_AVATAR,
+  coins: 0,
+  country: 'Global',
+  countryCode: 'UN',
+  interests: ['Gaming', 'Music'],
+  bio: '',
   isOnline: true,
 };
 

@@ -1,5 +1,6 @@
 import { api } from '../../../shared/api/client';
 import { UserProfile } from '../../auth/apis/authApi';
+import { DEFAULT_AVATAR } from '../../../shared/constants';
 
 export interface UserPreferences {
   preferredGender: 'ANY' | 'MALE' | 'FEMALE';
@@ -13,6 +14,7 @@ export interface ProfileData {
 }
 
 export interface UpdateProfilePayload {
+  username?: string;
   display_name?: string;
   bio?: string;
   gender?: string;
@@ -73,9 +75,20 @@ export const profileApi = {
       const result = await response.json();
       return result.secure_url || result.url;
     } catch (err) {
-      // In offline/test environments, create a local object URL fallback
-      console.warn('Direct Cloudinary upload failed, falling back to local object URL:', err);
-      return URL.createObjectURL(file);
+      console.warn('Direct Cloudinary upload failed, converting to Data URL:', err);
+      if (typeof FileReader !== 'undefined') {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve((reader.result as string) || DEFAULT_AVATAR);
+          };
+          reader.onerror = () => {
+            resolve(DEFAULT_AVATAR);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+      return DEFAULT_AVATAR;
     }
   },
 
@@ -84,4 +97,9 @@ export const profileApi = {
 
   getPublicProfile: (userId: string) =>
     api.get<Partial<UserProfile>>(`/users/${userId}`),
+
+  searchUsers: (usernameQuery: string) =>
+    api.get<Array<{ id: string; username: string; display_name: string; avatar_url?: string; age?: number; gender?: string }>>(
+      `/users/search?username=${encodeURIComponent(usernameQuery)}`
+    ),
 };

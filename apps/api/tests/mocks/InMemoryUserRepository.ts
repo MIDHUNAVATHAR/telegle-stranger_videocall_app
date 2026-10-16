@@ -40,8 +40,30 @@ export class InMemoryUserRepository implements UserRepository {
     return (await this.findByEmail(email)) !== null;
   }
 
-  public async existsByUsername(username: string): Promise<boolean> {
-    return (await this.findByUsername(username)) !== null;
+  public async existsByUsername(username: string, excludeUserId?: string): Promise<boolean> {
+    const clean = username.trim().toLowerCase();
+    for (const user of this.users.values()) {
+      if (excludeUserId && user.id === excludeUserId) continue;
+      if (user.username.toLowerCase() === clean) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public async searchByUsername(query: string, excludeUserId?: string): Promise<User[]> {
+    const clean = query.trim().toLowerCase().replace(/^@/, '');
+    if (!clean) return [];
+    const results: User[] = [];
+    for (const user of this.users.values()) {
+      if (excludeUserId && user.id === excludeUserId) continue;
+      if (user.isBanned) continue;
+      if (user.username.toLowerCase().includes(clean)) {
+        results.push(user);
+      }
+      if (results.length >= 10) break;
+    }
+    return results;
   }
 
   public async save(user: User): Promise<User> {

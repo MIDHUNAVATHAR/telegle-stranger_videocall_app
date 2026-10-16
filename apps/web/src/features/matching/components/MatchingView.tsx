@@ -1,26 +1,35 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../../../shared/components/Button';
-import { IconBolt, IconClock, IconShield, IconVideo, IconClose } from '../../../shared/components/Icons';
-import { SAMPLE_STRANGERS } from '../../../shared/constants';
+import { IconBolt, IconClock, IconShield, IconVideo, IconClose, IconLock } from '../../../shared/components/Icons';
+import { Toast } from '../../../shared/components/Toast';
 import { Stranger } from '../../../shared/types';
+import { useAuth } from '../../auth/hooks/useAuth';
 import { matchingApi } from '../apis/matchingApi';
 import { socketService } from '../services/socketClient';
+import { DEFAULT_AVATAR, getSafeAvatarUrl } from '../../../shared/constants';
 
 interface MatchingViewProps {
-  onMatchFound: (stranger: Stranger) => void;
+  onMatchFound: (stranger: Stranger, sessionId?: string, isInitiator?: boolean) => void;
   userCoins?: number;
   onOpenWallet?: () => void;
+  isAuthenticated?: boolean;
+  onRequireAuth?: () => void;
+  currentUserId?: string;
 }
 
 export const MatchingView: React.FC<MatchingViewProps> = ({
   onMatchFound,
   userCoins = 100,
   onOpenWallet,
+  isAuthenticated = false,
+  onRequireAuth,
+  currentUserId,
 }) => {
+  const { user: authUser } = useAuth();
   const [genderFilter, setGenderFilter] = useState<'ANY' | 'MALE' | 'FEMALE'>('ANY');
-  const [onlineCount, setOnlineCount] = useState<number>(1420);
+  const [onlineCount, setOnlineCount] = useState<number>(0);
   const [isSearching, setIsSearching] = useState(false);
   const [searchSeconds, setSearchSeconds] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -31,6 +40,32 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number>(10);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const [isInitiator, setIsInitiator] = useState<boolean>(true);
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const didIRejectRef = useRef(false);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    title: string;
+    message?: string;
+    type?: 'info' | 'warning' | 'error' | 'success';
+  } | null>(null);
+
+  const showToast = (
+    title: string,
+    message?: string,
+    type: 'info' | 'warning' | 'error' | 'success' = 'error'
+  ) => {
+    setToast({ title, message, type });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) {
+        clearInterval(searchTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // 1. Fetch real online presence count from REST API
@@ -38,11 +73,11 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
       .getOnlinePresence()
       .then((data) => {
         if (data && typeof data.online_count === 'number') {
-          setOnlineCount(data.online_count > 0 ? data.online_count : 1420);
+          setOnlineCount(data.online_count);
         }
       })
       .catch(() => {
-        // Fallback to initial benchmark
+        setOnlineCount(0);
       });
 
     // 2. Listen to real-time presence and matchmaking events via Socket.IO
@@ -50,31 +85,38 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
       const socket = socketService.getMatchmakingSocket();
       socket.on('presence_update', (data: { onlineCount: number }) => {
         if (data && typeof data.onlineCount === 'number') {
-          setOnlineCount(data.onlineCount > 0 ? data.onlineCount : 1420);
+          setOnlineCount(data.onlineCount);
         }
       });
 
       socket.on('match_found', (data: {
         sessionId: string;
         partnerId: string;
+        isInitiator?: boolean;
         partner?: {
           id: string;
-          displayName: string;
+          username?: string;
+          displayName?: string;
           avatarUrl?: string;
           age: number;
           gender: string;
         };
         timeoutSeconds?: number;
       }) => {
+        if (searchTimerRef.current) {
+          clearInterval(searchTimerRef.current);
+          searchTimerRef.current = null;
+        }
         setIsSearching(false);
         setActiveSessionId(data.sessionId);
+        setIsInitiator(typeof data.isInitiator === 'boolean' ? data.isInitiator : true);
         setDecisionNotice(null);
 
         const partnerStranger: Stranger = {
           id: data.partner?.id || data.partnerId,
-          name: data.partner?.displayName || 'Stranger',
+          name: data.partner?.username || data.partner?.displayName || 'Stranger',
           age: data.partner?.age || 22,
-          avatar: data.partner?.avatarUrl || '/logo.png',
+          avatar: getSafeAvatarUrl(data.partner?.avatarUrl, data.partner?.gender),
           gender: data.partner?.gender || 'ANY',
           country: 'Online',
           countryFlag: '⚡',
@@ -88,42 +130,84 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         setIsConfirmingMatch(true);
       });
 
-      socket.on('match_accepted', () => {
+      socket.on('match_accepted', (data?: { sessionId?: string; isInitiator?: boolean }) => {
         setIsConfirmingMatch(false);
-        if (matchedStranger) {
-          onMatchFound(matchedStranger);
+        if (typeof data?.isInitiator === 'boolean' && matchedStranger) {
+          const targetSessionId = data?.sessionId || activeSessionId || undefined;
+          onMatchFound(matchedStranger, targetSessionId, data.isInitiator);
         }
       });
 
-      socket.on('match_rejected', (data: { reason?: string }) => {
+      socket.on('call_ready', (data: { sessionId: string; isInitiator?: boolean }) => {
+        setIsConfirmingMatch(false);
+        const targetSessionId = data?.sessionId || activeSessionId || undefined;
+        const targetInitiator = typeof data?.isInitiator === 'boolean' ? data.isInitiator : isInitiator;
+        setIsInitiator(targetInitiator);
+        if (matchedStranger) {
+          onMatchFound(matchedStranger, targetSessionId, targetInitiator);
+        }
+      });
+
+      socket.on('match_rejected', (data: { reason?: string; rejectedBy?: string; sessionId?: string }) => {
         setIsConfirmingMatch(false);
         setMatchedStranger(null);
         setActiveSessionId(null);
-        setDecisionNotice(
-          data?.reason === 'REJECTED_BY_USER'
-            ? 'Match was declined by partner. Click START to match again.'
-            : 'Match was rejected. Click START to match again.'
-        );
+        setIsSearching(false);
+        if (searchTimerRef.current) {
+          clearInterval(searchTimerRef.current);
+          searchTimerRef.current = null;
+        }
+        matchingApi.leaveQueue().catch(() => {});
+
+        const myUid = currentUserId || authUser?.id || authUser?._id;
+        const wasRejectedByOther = data?.rejectedBy
+          ? data.rejectedBy !== myUid
+          : !didIRejectRef.current;
+
+        if (wasRejectedByOther) {
+          showToast(
+            'You are rejected',
+            'The stranger declined this match. Click START to find a new match.',
+            'error'
+          );
+          setDecisionNotice('You were rejected by the stranger. Click START to match again.');
+        } else {
+          setDecisionNotice('You declined the match. Click START to match again.');
+        }
+        didIRejectRef.current = false;
       });
 
       socket.on('match_cancelled', () => {
         setIsConfirmingMatch(false);
         setMatchedStranger(null);
         setActiveSessionId(null);
+        setIsSearching(false);
+        if (searchTimerRef.current) {
+          clearInterval(searchTimerRef.current);
+          searchTimerRef.current = null;
+        }
+        matchingApi.leaveQueue().catch(() => {});
+        showToast(
+          'Match Timed Out',
+          '10 seconds expired with no response. Click START to match again.',
+          'info'
+        );
         setDecisionNotice('Match cancelled: 10s expired with no response. Click START to match again.');
+        didIRejectRef.current = false;
       });
 
       return () => {
         socket.off('presence_update');
         socket.off('match_found');
         socket.off('match_accepted');
+        socket.off('call_ready');
         socket.off('match_rejected');
         socket.off('match_cancelled');
       };
     } catch {
       // In SSR or test environments, socket connection is skipped
     }
-  }, [onMatchFound, matchedStranger]);
+  }, [onMatchFound, matchedStranger, currentUserId, authUser, activeSessionId, isInitiator]);
 
   // 10-to-0 seconds countdown timer during match confirmation
   useEffect(() => {
@@ -145,6 +229,13 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
   }, [isConfirmingMatch, activeSessionId]);
 
   const handleAcceptMatch = async () => {
+    if (!isAuthenticated) {
+      if (onRequireAuth) {
+        onRequireAuth();
+      }
+      return;
+    }
+
     if (!activeSessionId || !matchedStranger) return;
 
     try {
@@ -156,10 +247,11 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
     }
 
     setIsConfirmingMatch(false);
-    onMatchFound(matchedStranger);
+    onMatchFound(matchedStranger, activeSessionId, isInitiator);
   };
 
   const handleRejectMatch = async () => {
+    didIRejectRef.current = true;
     if (activeSessionId) {
       try {
         const socket = socketService.getMatchmakingSocket();
@@ -173,7 +265,13 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
     setIsConfirmingMatch(false);
     setMatchedStranger(null);
     setActiveSessionId(null);
-    setDecisionNotice('Match rejected. Click START to search for another stranger.');
+    setIsSearching(false);
+    if (searchTimerRef.current) {
+      clearInterval(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    matchingApi.leaveQueue().catch(() => {});
+    setDecisionNotice('You declined the match. Click START to search again.');
   };
 
   const handleCancelMatch = async () => {
@@ -190,12 +288,31 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
     setIsConfirmingMatch(false);
     setMatchedStranger(null);
     setActiveSessionId(null);
+    setIsSearching(false);
+    if (searchTimerRef.current) {
+      clearInterval(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    matchingApi.leaveQueue().catch(() => {});
+    showToast(
+      'Match Timed Out',
+      '10 seconds expired with no response. Click START to match again.',
+      'info'
+    );
     setDecisionNotice('Match cancelled: 10 seconds expired. Click START to match again.');
   };
 
   const handleStartSearch = async () => {
     setErrorMessage(null);
     setDecisionNotice(null);
+
+    // Require authentication before starting video match
+    if (!isAuthenticated) {
+      if (onRequireAuth) {
+        onRequireAuth();
+      }
+      return;
+    }
 
     // If gender filter is selected, check coin balance
     if (genderFilter !== 'ANY' && userCoins < 1) {
@@ -206,10 +323,13 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
       return;
     }
 
+    if (searchTimerRef.current) {
+      clearInterval(searchTimerRef.current);
+    }
     setIsSearching(true);
     setSearchSeconds(0);
 
-    const timer = setInterval(() => {
+    searchTimerRef.current = setInterval(() => {
       setSearchSeconds((s) => s + 1);
     }, 1000);
 
@@ -218,15 +338,18 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
       const result = await matchingApi.joinQueue(genderFilter);
 
       if (result && result.status === 'PAIRED' && result.partnerId) {
-        clearInterval(timer);
+        if (searchTimerRef.current) {
+          clearInterval(searchTimerRef.current);
+          searchTimerRef.current = null;
+        }
         setIsSearching(false);
         setActiveSessionId(result.sessionId || `sess_${Date.now()}`);
 
         const matched: Stranger = {
           id: result.partner?.id || result.partnerId,
-          name: result.partner?.displayName || 'Stranger',
+          name: (result.partner as { username?: string; displayName?: string } | undefined)?.username || result.partner?.displayName || 'Stranger',
           age: result.partner?.age || 22,
-          avatar: result.partner?.avatarUrl || '/logo.png',
+          avatar: getSafeAvatarUrl(result.partner?.avatarUrl, result.partner?.gender),
           gender: result.partner?.gender || 'ANY',
           country: 'Online',
           countryFlag: '⚡',
@@ -238,34 +361,66 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         setMatchedStranger(matched);
         setCountdown(10);
         setIsConfirmingMatch(true);
-        return;
       }
-    } catch {
-      // Offline fallback: simulate match finding within 2.8 seconds
-    }
+    } catch (err: unknown) {
+      const errObj = err as Error & { message?: string };
+      // If already queued from earlier attempt or stale session, clear and rejoin cleanly
+      if (errObj?.message?.includes('already searching') || errObj?.message?.includes('ALREADY_IN_QUEUE')) {
+        try {
+          await matchingApi.leaveQueue().catch(() => {});
+          const retryResult = await matchingApi.joinQueue(genderFilter);
+          if (retryResult && retryResult.status === 'PAIRED' && retryResult.partnerId) {
+            if (searchTimerRef.current) {
+              clearInterval(searchTimerRef.current);
+              searchTimerRef.current = null;
+            }
+            setIsSearching(false);
+            setActiveSessionId(retryResult.sessionId || `sess_${Date.now()}`);
 
-    // Fallback simulation timer for standalone demo or demo strangers
-    const fallbackTimer = setTimeout(() => {
-      clearInterval(timer);
+            const matched: Stranger = {
+              id: retryResult.partner?.id || retryResult.partnerId,
+              name: (retryResult.partner as { username?: string; displayName?: string } | undefined)?.username || retryResult.partner?.displayName || 'Stranger',
+              age: retryResult.partner?.age || 22,
+              avatar: getSafeAvatarUrl(retryResult.partner?.avatarUrl, retryResult.partner?.gender),
+              gender: retryResult.partner?.gender || 'ANY',
+              country: 'Online',
+              countryFlag: '⚡',
+              interests: ['Video Chat'],
+              distanceKm: 0,
+              status: 'online',
+            };
+
+            setMatchedStranger(matched);
+            setCountdown(10);
+            setIsConfirmingMatch(true);
+            return;
+          }
+          // Successfully searching
+          return;
+        } catch {
+          // Fall through to display error
+        }
+      }
+
+      setErrorMessage(errObj?.message || 'Failed to connect to matchmaking queue.');
+      if (searchTimerRef.current) {
+        clearInterval(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
       setIsSearching(false);
-      const randomStranger =
-        SAMPLE_STRANGERS[Math.floor(Math.random() * SAMPLE_STRANGERS.length)];
-      setActiveSessionId(`sess_demo_${Date.now()}`);
-      setMatchedStranger(randomStranger);
-      setCountdown(10);
-      setIsConfirmingMatch(true);
-    }, 2800);
-
-    return () => {
-      clearInterval(timer);
-      clearTimeout(fallbackTimer);
-    };
+    }
   };
 
   const handleCancelSearch = async () => {
+    if (searchTimerRef.current) {
+      clearInterval(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
     setIsSearching(false);
     setSearchSeconds(0);
     try {
+      const socket = socketService.getMatchmakingSocket();
+      socket.emit('leave_queue');
       await matchingApi.leaveQueue();
     } catch {
       // Cleaned locally
@@ -281,67 +436,15 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         minHeight: 'calc(100vh - 160px)',
       }}
     >
-      {/* Top Header: Online Users Count (Left) & Coins Available (Right) */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px',
-          backgroundColor: 'var(--surface)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-        }}
-      >
-        {/* Current Online Users Number */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#22c55e',
-              boxShadow: '0 0 10px #22c55e',
-              display: 'inline-block',
-              animation: 'livePulse 2s infinite ease-in-out',
-            }}
-          />
-          <span
-            style={{
-              fontSize: '14px',
-              fontWeight: 700,
-              color: 'var(--ink)',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {onlineCount.toLocaleString()} online
-          </span>
-        </div>
-
-        {/* Right Top: Coins Available */}
-        <button
-          type="button"
-          onClick={onOpenWallet}
-          title={onOpenWallet ? 'Click to manage coins' : 'Available coins'}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: 'var(--surface-raised)',
-            border: '1px solid rgba(255, 90, 31, 0.35)',
-            color: 'var(--accent)',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: onOpenWallet ? 'pointer' : 'default',
-            transition: 'all var(--t-quick) ease',
-          }}
-        >
-          <IconBolt size={15} />
-          <span>{userCoins} Coins</span>
-        </button>
-      </div>
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          title={toast.title}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* Error Message Banner */}
       {errorMessage && (
@@ -419,15 +522,30 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span
-            style={{
-              fontSize: '13px',
-              fontWeight: 600,
-              color: 'var(--ink-secondary)',
-            }}
-          >
-            Gender Filter
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#22c55e',
+                boxShadow: '0 0 10px #22c55e',
+                display: 'inline-block',
+                animation: 'livePulse 2s infinite ease-in-out',
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: 'var(--ink)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {onlineCount.toLocaleString()} online
+            </span>
+          </div>
           <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>
             {genderFilter === 'ANY' ? 'Free matching' : '1 Coin on connection'}
           </span>
@@ -529,19 +647,21 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
               }}
             >
               <img
-                src={matchedStranger.avatar || '/logo.png'}
+                src={getSafeAvatarUrl(matchedStranger.avatar, matchedStranger.gender)}
                 alt={matchedStranger.name}
                 style={{
                   width: '110px',
                   height: '110px',
+                  aspectRatio: '1 / 1',
                   borderRadius: '50%',
                   objectFit: 'cover',
+                  display: 'block',
                   border: '3px solid var(--accent)',
                   boxShadow: '0 0 20px rgba(255, 90, 31, 0.4)',
                   backgroundColor: 'var(--surface)',
                 }}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/logo.png';
+                  (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
               />
               <span
@@ -886,12 +1006,22 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
             <span
               style={{
                 fontSize: '13px',
-                color: 'var(--ink-secondary)',
-                fontWeight: 500,
+                color: isAuthenticated ? 'var(--ink-secondary)' : 'var(--accent)',
+                fontWeight: isAuthenticated ? 500 : 600,
                 textAlign: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              Tap to match instantly with people online
+              {!isAuthenticated ? (
+                <>
+                  <IconLock size={14} />
+                  <span>Sign in required to start matching</span>
+                </>
+              ) : (
+                'Tap to match instantly with people online'
+              )}
             </span>
           </div>
         )}
@@ -918,7 +1048,7 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
             Strictly No Nudity · Respect Others
           </strong>
           <span style={{ fontSize: '12px', color: 'var(--ink-secondary)', marginTop: '2px' }}>
-            18+ community with zero tolerance for harassment. 5-report automated ban enabled.
+            18+ community with zero tolerance for harassment.
           </span>
         </div>
       </div>

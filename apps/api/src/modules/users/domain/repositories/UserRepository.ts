@@ -6,6 +6,7 @@ export interface UserRepository {
   findByUsername(username: string): Promise<User | null>;
   findByGoogleId(googleId: string): Promise<User | null>;
   existsByEmail(email: string): Promise<boolean>;
-  existsByUsername(username: string): Promise<boolean>;
+  existsByUsername(username: string, excludeUserId?: string): Promise<boolean>;
+  searchByUsername(query: string, excludeUserId?: string): Promise<User[]>;
   save(user: User): Promise<User>;
 }

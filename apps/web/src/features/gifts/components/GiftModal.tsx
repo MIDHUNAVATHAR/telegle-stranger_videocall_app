@@ -3,15 +3,23 @@
 import React, { useEffect, useState } from 'react';
 import { IVirtualGift } from '@donkey-play/shared-types';
 import { Modal } from '../../../shared/components/Modal';
-import { IconBolt, IconGift } from '../../../shared/components/Icons';
+import { IconGift, IconDollar } from '../../../shared/components/Icons';
 import { VirtualGift } from '../../../shared/types';
 import { giftsApi } from '../giftsApi';
 
 const DEFAULT_GIFTS: IVirtualGift[] = [
   { id: 'gift_rose_5c', name: 'Rose', slug: 'rose-5c', coinPrice: 5, creatorEarningPaise: 350, iconUrl: '🌹' },
+  { id: 'gift_coffee_5c', name: 'Hot Coffee', slug: 'coffee-5c', coinPrice: 5, creatorEarningPaise: 350, iconUrl: '☕' },
   { id: 'gift_banana_10c', name: 'Banana', slug: 'banana-10c', coinPrice: 10, creatorEarningPaise: 700, iconUrl: '🍌' },
+  { id: 'gift_chocolate_10c', name: 'Chocolate', slug: 'chocolate-10c', coinPrice: 10, creatorEarningPaise: 700, iconUrl: '🍫' },
+  { id: 'gift_fire_15c', name: 'Fire Flame', slug: 'fire-15c', coinPrice: 15, creatorEarningPaise: 1050, iconUrl: '🔥' },
   { id: 'gift_heart_25c', name: 'Heart Glow', slug: 'heart-25c', coinPrice: 25, creatorEarningPaise: 1750, iconUrl: '💖' },
+  { id: 'gift_party_35c', name: 'Party Popper', slug: 'party-35c', coinPrice: 35, creatorEarningPaise: 2450, iconUrl: '🎉' },
+  { id: 'gift_diamond_50c', name: 'Diamond', slug: 'diamond-50c', coinPrice: 50, creatorEarningPaise: 3500, iconUrl: '💎' },
+  { id: 'gift_rocket_75c', name: 'Rocket', slug: 'rocket-75c', coinPrice: 75, creatorEarningPaise: 5250, iconUrl: '🚀' },
   { id: 'gift_crown_100c', name: 'Royal Crown', slug: 'crown-100c', coinPrice: 100, creatorEarningPaise: 7000, iconUrl: '👑' },
+  { id: 'gift_car_250c', name: 'Sports Car', slug: 'car-250c', coinPrice: 250, creatorEarningPaise: 17500, iconUrl: '🏎️' },
+  { id: 'gift_castle_500c', name: 'Golden Castle', slug: 'castle-500c', coinPrice: 500, creatorEarningPaise: 35000, iconUrl: '🏰' },
 ];
 
 interface GiftModalProps {
@@ -120,10 +128,10 @@ export const GiftModal: React.FC<GiftModalProps> = ({
               alignItems: 'center',
               gap: '6px',
               fontSize: 'var(--step-lead)',
-              color: 'var(--accent)',
+              color: '#22c55e',
             }}
           >
-            <IconBolt size={18} /> {coins} Coins
+            <IconDollar size={18} color="#22c55e" /> {coins} Coins
           </strong>
         </div>
 
@@ -131,8 +139,11 @@ export const GiftModal: React.FC<GiftModalProps> = ({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '12px',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+            gap: '10px',
+            maxHeight: '340px',
+            overflowY: 'auto',
+            paddingRight: '4px',
           }}
         >
           {gifts.map((gift) => {
@@ -146,30 +157,30 @@ export const GiftModal: React.FC<GiftModalProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  padding: 'var(--space-16)',
+                  padding: '12px 8px',
                   backgroundColor: 'var(--surface-raised)',
                   borderRadius: 'var(--radius-md)',
                   opacity: canAfford ? 1 : 0.45,
                   cursor: canAfford && !isSending ? 'pointer' : 'not-allowed',
                   transition: 'background-color var(--t-quick) ease, transform var(--t-press) ease',
                   textAlign: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   border: '1px solid rgba(255, 255, 255, 0.06)',
                 }}
               >
                 <div
                   style={{
-                    width: '52px',
-                    height: '52px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor: 'var(--surface)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '28px',
+                    fontSize: '24px',
                   }}
                 >
-                  {gift.iconUrl ? gift.iconUrl : <IconGift size={24} />}
+                  {gift.iconUrl ? gift.iconUrl : <IconGift size={22} />}
                 </div>
                 <span
                   style={{
@@ -186,11 +197,11 @@ export const GiftModal: React.FC<GiftModalProps> = ({
                     alignItems: 'center',
                     gap: '4px',
                     fontSize: 'var(--step-small)',
-                    color: 'var(--accent)',
+                    color: '#22c55e',
                     fontWeight: 700,
                   }}
                 >
-                  <IconBolt size={14} /> {gift.coinPrice} Coins
+                  <IconDollar size={14} color="#22c55e" /> {gift.coinPrice} Coins
                 </span>
               </button>
             );

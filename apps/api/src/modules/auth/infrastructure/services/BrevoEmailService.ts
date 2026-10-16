@@ -13,10 +13,17 @@ export class BrevoEmailService implements EmailService {
   ) {}
 
   public async sendOtpEmail(email: string, otp: string): Promise<void> {
-    if (!this.apiKey || env.NODE_ENV === 'test') {
-      logger.info(`[Brevo Email Service] Mock mode: Verification code email prepared for ${email}`);
+    if (!this.apiKey) {
+      logger.info(`[Brevo Email Service] Mock mode (no BREVO_API_KEY found): Verification code email prepared for ${email}`);
       return;
     }
+
+    if (env.NODE_ENV === 'test') {
+      logger.info(`[Brevo Email Service] Test mode (NODE_ENV=test): Verification code email prepared for ${email}`);
+      return;
+    }
+
+    logger.info(`[Brevo Email Service] Dispatching OTP email to ${email} via Brevo API (Sender: ${this.senderEmail})...`);
 
     try {
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -31,10 +38,10 @@ export class BrevoEmailService implements EmailService {
             email: this.senderEmail,
           },
           to: [{ email }],
-          subject: 'Your Donkey Play Verification Code',
+          subject: 'Your Telegle Verification Code',
           htmlContent: `
             <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
-              <h2 style="color: #FF5A1F; margin-bottom: 8px;">Donkey Play</h2>
+              <h2 style="color: #FF5A1F; margin-bottom: 8px;">Telegle</h2>
               <p style="font-size: 16px; color: #333;">Welcome! Use the verification code below to sign in:</p>
               <div style="background-color: #FFF4F0; border: 1px dashed #FF5A1F; border-radius: 8px; padding: 16px; text-align: center; margin: 24px 0;">
                 <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #FF5A1F;">${otp}</span>

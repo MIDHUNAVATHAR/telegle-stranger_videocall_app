@@ -77,4 +77,21 @@ export class ModerationController {
       next(err);
     }
   };
+
+  checkBlockStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id || '';
+      const targetUserId = Array.isArray(req.params.targetUserId)
+        ? req.params.targetUserId[0]
+        : (req.params.targetUserId as string);
+
+      const status = await this.moderationUseCases.checkBlockStatus(userId, targetUserId);
+      res.status(200).json({
+        success: true,
+        data: status,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
 }

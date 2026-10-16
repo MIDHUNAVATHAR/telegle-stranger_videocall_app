@@ -6,9 +6,13 @@ import { JwtTokenService, AuthTokens } from '../../infrastructure/services/JwtTo
 import { AccountBannedError } from '../../domain/errors/AuthErrors';
 import { UserPreferencesModel } from '../../../users/infrastructure/persistence/mongoose/UserPreferencesModel';
 import { WalletModel } from '../../../users/infrastructure/persistence/mongoose/WalletModel';
+import { IWalletRepository } from '../../../wallet/domain/repositories/WalletRepository';
+import { MongooseWalletRepository } from '../../../wallet/infrastructure/persistence/repositories/MongooseWalletRepository';
+import { env } from '../../../../config/env';
 
 export interface GoogleAuthInput {
   idToken: string;
+  referralCode?: string;
 }
 
 export interface GoogleAuthOutput {
@@ -21,7 +25,8 @@ export class GoogleAuthUseCase {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly googleVerifier: GoogleAuthVerifier = new GoogleAuthVerifier(),
-    private readonly tokenService: JwtTokenService = new JwtTokenService()
+    private readonly tokenService: JwtTokenService = new JwtTokenService(),
+    private readonly walletRepo: IWalletRepository = new MongooseWalletRepository()
   ) {}
 
   public async execute(input: GoogleAuthInput): Promise<GoogleAuthOutput> {
@@ -67,6 +72,36 @@ export class GoogleAuthUseCase {
           ]);
         } catch {
           // Tolerates test/in-memory mocks
+        }
+      }
+
+      // Referral Reward Logic:
+      // If a referral code was passed, reward only the referrer who sent the link with 10 free coins
+      if (input.referralCode) {
+        try {
+          const rawCode = input.referralCode.trim();
+          const cleanCode = rawCode.includes('ref=')
+            ? rawCode.split('ref=')[1].split('&')[0]
+            : rawCode.replace(/^@/, '');
+
+          let referrer = await this.userRepository.findByUsername(cleanCode);
+          if (!referrer) {
+            referrer = await this.userRepository.findById(cleanCode);
+          }
+
+          if (referrer && referrer.id !== user.id) {
+            // Reward referrer: dynamic bonus coins from env (added to purchased coins balance)
+            await this.walletRepo.creditCoins(
+              referrer.id,
+              env.REFERRAL_REWARD_COINS,
+              `ref_reward_${referrer.id}_${user.id}`,
+              'SYSTEM',
+              user.id,
+              { reason: 'REFERRAL_REWARD', referredUserId: user.id }
+            );
+          }
+        } catch (refErr) {
+          console.warn('Referral reward processing error in GoogleAuthUseCase:', refErr);
         }
       }
     }

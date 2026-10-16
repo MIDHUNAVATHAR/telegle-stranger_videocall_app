@@ -181,8 +181,8 @@ export class RazorpayService {
               address: params.upiId,
             },
             contact: {
-              name: params.userName || 'Donkey Play Creator',
-              email: params.userEmail || 'creator@donkeyplay.com',
+              name: params.userName || 'Telegle Creator',
+              email: params.userEmail || 'creator@telegle.com',
               type: 'self',
             },
           },
@@ -192,7 +192,7 @@ export class RazorpayService {
           purpose: 'payout',
           queue_if_low_balance: true,
           reference_id: params.referenceId,
-          narration: params.narration || 'Donkey Play Creator Payout',
+          narration: params.narration || 'Telegle Creator Payout',
         }),
       });
 

@@ -1,6 +1,7 @@
 import { MatchmakingService, JoinQueueResult } from '../../infrastructure/services/MatchmakingService';
 import { UserRepository } from '../../../users/domain/repositories/UserRepository';
 import { UserNotFoundError } from '../../../users/domain/errors/UserErrors';
+import { IWalletRepository } from '../../../wallet/domain/repositories/WalletRepository';
 
 export interface JoinQueueInput {
   userId: string;
@@ -10,7 +11,8 @@ export interface JoinQueueInput {
 export class JoinQueueUseCase {
   constructor(
     private readonly matchmakingService: MatchmakingService,
-    private readonly userRepository: UserRepository
+    private readonly userRepository: UserRepository,
+    private readonly walletRepository?: IWalletRepository
   ) {}
 
   public async execute(input: JoinQueueInput): Promise<JoinQueueResult> {
@@ -19,9 +21,17 @@ export class JoinQueueUseCase {
       throw new UserNotFoundError(input.userId);
     }
 
-    // Default coin balance for testing/guest fallback is 100 or user karma
-    // Persistent wallet balance will be integrated in Phase 7 (Wallet module)
-    const coinBalance = 100;
+    let coinBalance = 100;
+    if (this.walletRepository) {
+      try {
+        const wallet = await this.walletRepository.createOrGet(user.id);
+        coinBalance = wallet.purchasedCoinsBalance;
+      } catch (err) {
+        if (input.filter !== 'ANY') {
+          throw err;
+        }
+      }
+    }
 
     const result = await this.matchmakingService.joinQueue(
       user.id,

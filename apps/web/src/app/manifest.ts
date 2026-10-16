@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Donkey Play — Live Random Video Chat & Stranger Calls',
-    short_name: 'Donkey Play',
+    name: 'Telegle — Meet Strangers. Make Connections',
+    short_name: 'Telegle',
     description:
-      'Safe 1-on-1 random video chat, live stranger calls, and Omegle alternative for adults 18+.',
+      'Safe 1-on-1 random video chat, live stranger calls, and Meet Strangers. Make Connections for adults 18+.',
     start_url: '/',
     display: 'standalone',
     background_color: '#0c0e12',

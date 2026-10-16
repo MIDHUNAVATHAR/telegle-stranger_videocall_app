@@ -6,4 +6,5 @@ export interface IModerationRepository {
   deleteBlock(userId: string, blockedUserId: string): Promise<boolean>;
   listBlocks(userId: string): Promise<IBlockEntity[]>;
   isBlocked(userAId: string, userBId: string): Promise<boolean>;
+  checkBlockStatus(userAId: string, userBId: string): Promise<{ isBlockedByA: boolean; isBlockedByB: boolean }>;
 }

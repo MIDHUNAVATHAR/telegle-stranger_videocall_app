@@ -1,9 +1,9 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IReportDocument extends Document {
-  reporter_id: Types.ObjectId;
-  reported_user_id: Types.ObjectId;
-  match_id?: Types.ObjectId;
+  reporter_id: Types.ObjectId | string;
+  reported_user_id: Types.ObjectId | string;
+  match_id?: Types.ObjectId | string;
   reason: string;
   details?: string;
   status: 'PENDING' | 'ACTIONED' | 'DISMISSED';
@@ -12,8 +12,8 @@ export interface IReportDocument extends Document {
 }
 
 export interface IBlockDocument extends Document {
-  user_id: Types.ObjectId;
-  blocked_user_id: Types.ObjectId;
+  user_id: Types.ObjectId | string;
+  blocked_user_id: Types.ObjectId | string;
   reason: 'USER_INITIATED' | 'POST_REPORT_AUTO';
   expires_at?: Date | null;
   created_at: Date;
@@ -21,9 +21,9 @@ export interface IBlockDocument extends Document {
 
 const ReportSchema = new Schema<IReportDocument>(
   {
-    reporter_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    reported_user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    match_id: { type: Schema.Types.ObjectId, ref: 'Match' },
+    reporter_id: { type: Schema.Types.Mixed, required: true, index: true },
+    reported_user_id: { type: Schema.Types.Mixed, required: true, index: true },
+    match_id: { type: Schema.Types.Mixed },
     reason: {
       type: String,
       required: true,
@@ -52,8 +52,8 @@ ReportSchema.index({ reported_user_id: 1, created_at: -1 });
 
 const BlockSchema = new Schema<IBlockDocument>(
   {
-    user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    blocked_user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    user_id: { type: Schema.Types.Mixed, required: true, index: true },
+    blocked_user_id: { type: Schema.Types.Mixed, required: true, index: true },
     reason: {
       type: String,
       required: true,

@@ -233,13 +233,13 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
       const res = await request(app)
         .post('/api/v1/wallet/withdraw')
         .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amountInr: 100 });
+        .send({ amountInr: 500 });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('MISSING_PAYOUT_UPI');
     });
 
-    it('should reject withdrawal when earnings balance is insufficient', async () => {
+    it('should reject withdrawal when earnings balance is below minimum 500 threshold', async () => {
       // Set UPI ID first
       await request(app)
         .put('/api/v1/wallet/upi')
@@ -249,10 +249,10 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
       const res = await request(app)
         .post('/api/v1/wallet/withdraw')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ amountInr: 50 });
+        .send({ amountInr: 500 });
 
       expect(res.status).toBe(400);
-      expect(res.body.error.code).toBe('INSUFFICIENT_EARNINGS');
+      expect(res.body.error.code).toBe('MINIMUM_WITHDRAWAL_NOT_MET');
     });
 
     it('should reject withdrawal when user has purchased coins but no gift earnings', async () => {
@@ -274,11 +274,10 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
       const res = await request(app)
         .post('/api/v1/wallet/withdraw')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ amountInr: 50 });
+        .send({ amountInr: 500 });
 
       expect(res.status).toBe(400);
-      expect(res.body.error.code).toBe('PURCHASED_COINS_NON_WITHDRAWABLE');
-      expect(res.body.error.message).toContain('Purchased coins cannot be withdrawn');
+      expect(res.body.error.code).toBe('MINIMUM_WITHDRAWAL_NOT_MET');
     });
 
     it('should disburse withdrawal via Razorpay, deduct balance, and log transaction', async () => {
@@ -288,10 +287,10 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ upiId: 'alex@okhdfcbank' });
 
-      // 2. Credit test earnings (e.g. 7000 paise = ₹70 from received gifts)
+      // 2. Credit test earnings (70,000 paise = ₹700 from received gifts)
       await walletRepository.creditEarningsPaise(
         testUser.id,
-        7000,
+        70000,
         `credit_gift_${Date.now()}`,
         'GIFT',
         'gift_test_123'
@@ -301,24 +300,24 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
       const balBefore = await request(app)
         .get('/api/v1/wallet/balance')
         .set('Authorization', `Bearer ${authToken}`);
-      expect(balBefore.body.data.withdrawableEarningsPaise).toBe(7000);
-      expect(balBefore.body.data.withdrawableEarningsInr).toBe(70);
+      expect(balBefore.body.data.withdrawableEarningsPaise).toBe(70000);
+      expect(balBefore.body.data.withdrawableEarningsInr).toBe(700);
 
-      // 3. Request withdrawal of ₹50
+      // 3. Request withdrawal of ₹500
       const res = await request(app)
         .post('/api/v1/wallet/withdraw')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ amountInr: 50 });
+        .send({ amountInr: 500 });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data).toHaveProperty('payoutId');
-      expect(res.body.data.amountInr).toBe(50);
-      expect(res.body.data.amountPaise).toBe(5000);
+      expect(res.body.data.amountInr).toBe(500);
+      expect(res.body.data.amountPaise).toBe(50000);
       expect(res.body.data.upiId).toBe('alex@okhdfcbank');
       expect(res.body.data.status).toBe('COMPLETED');
-      expect(res.body.data.remainingEarningsPaise).toBe(2000);
-      expect(res.body.data.remainingEarningsInr).toBe(20);
+      expect(res.body.data.remainingEarningsPaise).toBe(20000);
+      expect(res.body.data.remainingEarningsInr).toBe(200);
 
       // 4. Verify transaction was recorded
       const txRes = await request(app)
@@ -329,7 +328,7 @@ describe('Phase 7: Coin Wallet & Razorpay Payments Module', () => {
         (tx: { type: string }) => tx.type === 'WITHDRAWAL_PAYOUT'
       );
       expect(withdrawalTx).toBeDefined();
-      expect(withdrawalTx.currencyAmountPaise).toBe(-5000);
+      expect(withdrawalTx.currencyAmountPaise).toBe(-50000);
     });
   });
 });
