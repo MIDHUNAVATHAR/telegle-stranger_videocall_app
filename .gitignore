@@ -14,7 +14,10 @@ out/
 # Environment files
 .env
 .env*.local
-!.env.example
+!.env*.example
+apps/*/.env
+apps/*/.env*.local
+!apps/*/.env*.example
 
 # Logs
 *.log

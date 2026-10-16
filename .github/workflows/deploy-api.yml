@@ -61,6 +61,7 @@ jobs:
   deploy-to-server:
     name: Deploy API to Server via Docker
     needs: validate-and-test
+    if: false # BLOCKED: Backend deployment process is disabled
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
