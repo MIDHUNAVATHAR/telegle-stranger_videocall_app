@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { getClientAccessToken } from '../../../shared/api/client';
+import { getClientAccessToken, getClientRefreshToken } from '../../../shared/api/client';
 
 const getSocketUrl = (): string => {
   const url = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:5000';
@@ -15,10 +15,11 @@ class SocketService {
 
   public getMatchmakingSocket(token?: string): Socket {
     const activeToken = token || getClientAccessToken() || undefined;
+    const refreshToken = getClientRefreshToken() || undefined;
 
     if (!this.matchmakingSocket) {
       this.matchmakingSocket = io(`${SOCKET_URL}/matchmaking`, {
-        auth: { token: activeToken },
+        auth: { token: activeToken, refreshToken },
         withCredentials: true,
         transports: ['websocket', 'polling'],
         autoConnect: true,
@@ -26,9 +27,9 @@ class SocketService {
 
       this.startHeartbeat();
     } else {
-      const currentToken = (this.matchmakingSocket.auth as { token?: string })?.token;
+      const currentToken = (this.matchmakingSocket.auth as { token?: string; refreshToken?: string })?.token;
       if (activeToken !== currentToken) {
-        this.matchmakingSocket.auth = { token: activeToken };
+        this.matchmakingSocket.auth = { token: activeToken, refreshToken };
         if (!this.matchmakingSocket.connected) {
           this.matchmakingSocket.connect();
         }
@@ -39,18 +40,19 @@ class SocketService {
 
   public getSignalingSocket(token?: string): Socket {
     const activeToken = token || getClientAccessToken() || undefined;
+    const refreshToken = getClientRefreshToken() || undefined;
 
     if (!this.signalingSocket) {
       this.signalingSocket = io(`${SOCKET_URL}/signaling`, {
-        auth: { token: activeToken },
+        auth: { token: activeToken, refreshToken },
         withCredentials: true,
         transports: ['websocket', 'polling'],
         autoConnect: true,
       });
     } else {
-      const currentToken = (this.signalingSocket.auth as { token?: string })?.token;
+      const currentToken = (this.signalingSocket.auth as { token?: string; refreshToken?: string })?.token;
       if (activeToken !== currentToken) {
-        this.signalingSocket.auth = { token: activeToken };
+        this.signalingSocket.auth = { token: activeToken, refreshToken };
         if (!this.signalingSocket.connected) {
           this.signalingSocket.connect();
         }

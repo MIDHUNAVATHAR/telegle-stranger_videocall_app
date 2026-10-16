@@ -102,9 +102,10 @@ export class SocketServer {
 
         if (!userId) {
           const cookieRefreshToken = parseCookieValue(socket.handshake.headers?.cookie, 'dp_refresh_token');
-          if (cookieRefreshToken) {
+          const refreshToken = (socket.handshake.auth?.refreshToken as string | undefined) || cookieRefreshToken;
+          if (refreshToken) {
             try {
-              const refreshPayload = this.tokenService.verifyRefreshToken(cookieRefreshToken);
+              const refreshPayload = this.tokenService.verifyRefreshToken(refreshToken);
               userId = refreshPayload.sub;
               role = 'USER';
             } catch {

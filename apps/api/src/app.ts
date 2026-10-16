@@ -30,6 +30,9 @@ export interface AppOptions {
 export const createApp = (options: AppOptions = {}): Application => {
   const app = express();
 
+  // Trust reverse proxy (e.g. ngrok, Docker, cloud load balancers)
+  app.set('trust proxy', 1);
+
   // Security headers with Helmet
   app.use(
     helmet({
@@ -44,7 +47,23 @@ export const createApp = (options: AppOptions = {}): Application => {
     cors({
       origin: (origin, callback) => {
         // Allow requests with no origin (such as mobile apps, curl, or server-to-server)
-        if (!origin || allowedOrigins.includes(origin) || env.NODE_ENV === 'test') {
+        let isVercel = false;
+        try {
+          if (origin) {
+            const parsed = new URL(origin);
+            isVercel = parsed.hostname.endsWith('.vercel.app') || parsed.hostname === 'vercel.app';
+          }
+        } catch {
+          isVercel = false;
+        }
+
+        if (
+          !origin ||
+          allowedOrigins.includes(origin) ||
+          allowedOrigins.includes('*') ||
+          isVercel ||
+          env.NODE_ENV === 'test'
+        ) {
           callback(null, true);
         } else {
           callback(new Error(`CORS origin not allowed: ${origin}`));
@@ -52,7 +71,14 @@ export const createApp = (options: AppOptions = {}): Application => {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Idempotency-Key'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Idempotency-Key',
+        'ngrok-skip-browser-warning',
+      ],
     })
   );
 

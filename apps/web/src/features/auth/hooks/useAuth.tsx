@@ -2,7 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authApi, UserProfile } from '../apis/authApi';
-import { setClientAccessToken } from '../../../shared/api/client';
+import {
+  setClientAccessToken,
+  getClientAccessToken,
+  setClientRefreshToken,
+  getClientRefreshToken,
+} from '../../../shared/api/client';
 import { socketService } from '../../matching/services/socketClient';
 
 interface AuthContextType {
@@ -26,26 +31,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Check active session on initial mount:
-  // When user loads the page the first time, call refresh endpoint
-  // for a new 15-minute access token and a new rotated 14-day refresh token in cookie
+  // Check active session on initial mount / page reload:
+  // Calls refresh endpoint with stored refresh token (or HttpOnly cookie)
+  // to get a new 15-minute access token and rotated refresh token
   const checkSession = useCallback(async () => {
     try {
       setIsLoading(true);
+      const storedRefreshToken = getClientRefreshToken();
+      const storedAccessToken = getClientAccessToken();
+
       try {
-        const refreshRes = await authApi.refreshToken();
+        const refreshRes = await authApi.refreshToken(storedRefreshToken || undefined);
         if (refreshRes && refreshRes.user) {
           if (refreshRes.tokens?.access_token) {
             setClientAccessToken(refreshRes.tokens.access_token);
+          }
+          if (refreshRes.tokens?.refresh_token) {
+            setClientRefreshToken(refreshRes.tokens.refresh_token);
           }
           setUser(refreshRes.user);
           return;
         }
       } catch {
-        // If refresh fails (no refresh cookie or expired), fallback to getMe or set unauthenticated
+        // Refresh failed (e.g. no valid refresh token / cookie)
       }
-      const profile = await authApi.getMe();
-      setUser(profile);
+
+      // Fallback: If we still have an access token, try getMe
+      if (storedAccessToken) {
+        try {
+          const profile = await authApi.getMe();
+          if (profile && (profile.id || profile._id)) {
+            setUser(profile);
+            return;
+          }
+        } catch {
+          // getMe also failed
+        }
+      }
+
+      setUser(null);
     } catch {
       setUser(null);
     } finally {
@@ -104,6 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setClientAccessToken(response.tokens.access_token);
       socketService.disconnect();
     }
+    if (response.tokens?.refresh_token) {
+      setClientRefreshToken(response.tokens.refresh_token);
+    }
     setUser(response.user);
     setIsAuthModalOpen(false);
     return { is_new_user: response.is_new_user };
@@ -117,6 +144,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setClientAccessToken(response.tokens.access_token);
       socketService.disconnect();
     }
+    if (response.tokens?.refresh_token) {
+      setClientRefreshToken(response.tokens.refresh_token);
+    }
     setUser(response.user);
     setIsAuthModalOpen(false);
     return { is_new_user: response.is_new_user };
@@ -127,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authApi.logout();
     } finally {
       setClientAccessToken(null);
+      setClientRefreshToken(null);
       socketService.disconnect();
       setUser(null);
       setIsAuthModalOpen(true);

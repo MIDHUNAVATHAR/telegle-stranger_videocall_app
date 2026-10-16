@@ -680,6 +680,7 @@ function AppContent() {
         position: 'relative',
         backgroundColor: 'var(--bg)',
         color: 'var(--ink)',
+        pointerEvents: isLoading ? 'none' : 'auto',
       }}
     >
       {/* Top Header Bar (Hidden during active fullscreen video call) */}
@@ -771,10 +772,13 @@ function AppContent() {
           ) : (
             <button
               onClick={openAuthModal}
+              disabled={isLoading}
+              aria-busy={isLoading}
+              aria-label={isLoading ? 'Signing in, please wait' : 'Sign In'}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 padding: '8px 16px',
                 borderRadius: 'var(--radius-full)',
                 backgroundColor: 'var(--accent)',
@@ -782,10 +786,29 @@ function AppContent() {
                 fontSize: '13px',
                 fontWeight: 700,
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isLoading ? 'wait' : 'pointer',
+                opacity: isLoading ? 0.85 : 1,
+                transition: 'all 0.2s ease',
               }}
             >
-              Sign In
+              {isLoading ? (
+                <>
+                  <span
+                    style={{
+                      width: '13px',
+                      height: '13px',
+                      border: '2px solid rgba(255, 255, 255, 0.35)',
+                      borderTopColor: '#ffffff',
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      animation: 'btnSpin 0.75s linear infinite',
+                    }}
+                  />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                'Sign In'
+              )}
             </button>
           )}
         </div>
@@ -853,17 +876,40 @@ function AppContent() {
               </p>
               <button
                 onClick={openAuthModal}
+                disabled={isLoading}
+                aria-busy={isLoading}
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   padding: '8px 20px',
                   borderRadius: 'var(--radius-full)',
                   backgroundColor: 'var(--accent)',
                   color: '#ffffff',
                   border: 'none',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isLoading ? 'wait' : 'pointer',
+                  opacity: isLoading ? 0.85 : 1,
                 }}
               >
-                Sign In
+                {isLoading ? (
+                  <>
+                    <span
+                      style={{
+                        width: '13px',
+                        height: '13px',
+                        border: '2px solid rgba(255, 255, 255, 0.35)',
+                        borderTopColor: '#ffffff',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'btnSpin 0.75s linear infinite',
+                      }}
+                    />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </button>
             </div>
           )
@@ -887,17 +933,40 @@ function AppContent() {
               </p>
               <button
                 onClick={openAuthModal}
+                disabled={isLoading}
+                aria-busy={isLoading}
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   padding: '8px 20px',
                   borderRadius: 'var(--radius-full)',
                   backgroundColor: 'var(--accent)',
                   color: '#ffffff',
                   border: 'none',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isLoading ? 'wait' : 'pointer',
+                  opacity: isLoading ? 0.85 : 1,
                 }}
               >
-                Sign In
+                {isLoading ? (
+                  <>
+                    <span
+                      style={{
+                        width: '13px',
+                        height: '13px',
+                        border: '2px solid rgba(255, 255, 255, 0.35)',
+                        borderTopColor: '#ffffff',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'btnSpin 0.75s linear infinite',
+                      }}
+                    />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </button>
             </div>
           )
@@ -927,17 +996,40 @@ function AppContent() {
               </p>
               <button
                 onClick={openAuthModal}
+                disabled={isLoading}
+                aria-busy={isLoading}
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   padding: '8px 20px',
                   borderRadius: 'var(--radius-full)',
                   backgroundColor: 'var(--accent)',
                   color: '#ffffff',
                   border: 'none',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isLoading ? 'wait' : 'pointer',
+                  opacity: isLoading ? 0.85 : 1,
                 }}
               >
-                Sign In
+                {isLoading ? (
+                  <>
+                    <span
+                      style={{
+                        width: '13px',
+                        height: '13px',
+                        border: '2px solid rgba(255, 255, 255, 0.35)',
+                        borderTopColor: '#ffffff',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'btnSpin 0.75s linear infinite',
+                      }}
+                    />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </button>
             </div>
           )
@@ -1499,8 +1591,12 @@ function AppContent() {
         </div>
       )}
 
-      {/* Global Call Keyframe Animations */}
+      {/* Global Call Keyframe Animations & Loading State */}
       <style>{`
+        @keyframes btnSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
         @keyframes callRingPulse {
           0% { transform: scale(0.95); opacity: 0.8; }
           50% { transform: scale(1.18); opacity: 0.3; }
@@ -1514,6 +1610,12 @@ function AppContent() {
           from { opacity: 0; transform: scale(0.92); }
           to { opacity: 1; transform: scale(1); }
         }
+        ${isLoading ? `
+          button, [role="button"], a {
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+          }
+        ` : ''}
       `}</style>
     </div>
   );

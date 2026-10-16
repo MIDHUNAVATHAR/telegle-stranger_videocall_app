@@ -17,7 +17,24 @@ export class ApiError extends Error {
   }
 }
 
+export const setCookie = (name: string, value: string | null, days: number = 14): void => {
+  if (typeof document === 'undefined') return;
+  if (!value) {
+    document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax; Secure`;
+    return;
+  }
+  const maxAge = days * 24 * 60 * 60;
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax; Secure`;
+};
+
+export const getCookie = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
 let inMemoryToken: string | null = null;
+let inMemoryRefreshToken: string | null = null;
 
 export const setClientAccessToken = (token: string | null): void => {
   inMemoryToken = token;
@@ -27,19 +44,90 @@ export const setClientAccessToken = (token: string | null): void => {
     } else {
       localStorage.removeItem('dp_access_token');
     }
+    setCookie('dp_access_token', token, 1);
   }
 };
 
 export const getClientAccessToken = (): string | null => {
   if (inMemoryToken) return inMemoryToken;
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('dp_access_token');
+    const fromStorage = localStorage.getItem('dp_access_token');
+    if (fromStorage) return fromStorage;
+    const fromCookie = getCookie('dp_access_token');
+    if (fromCookie) return fromCookie;
+  }
+  return null;
+};
+
+export const setClientRefreshToken = (token: string | null): void => {
+  inMemoryRefreshToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('dp_refresh_token', token);
+    } else {
+      localStorage.removeItem('dp_refresh_token');
+    }
+    setCookie('dp_refresh_token', token, 14);
+  }
+};
+
+export const getClientRefreshToken = (): string | null => {
+  if (inMemoryRefreshToken) return inMemoryRefreshToken;
+  if (typeof window !== 'undefined') {
+    const fromStorage = localStorage.getItem('dp_refresh_token');
+    if (fromStorage) return fromStorage;
+    const fromCookie = getCookie('dp_refresh_token');
+    if (fromCookie) return fromCookie;
   }
   return null;
 };
 
 interface ExtendedRequestInit extends RequestInit {
   _isRetry?: boolean;
+}
+
+// Single in-flight refresh promise to deduplicate concurrent 401 refresh calls
+let refreshPromise: Promise<string | null> | null = null;
+
+async function executeTokenRefresh(): Promise<string | null> {
+  const baseUrl = getApiBaseUrl();
+  const storedRefreshToken = getClientRefreshToken();
+
+  try {
+    const refreshUrl = `${baseUrl}/auth/refresh`;
+    const refreshRes = await fetch(refreshUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      credentials: 'include',
+      body: JSON.stringify(storedRefreshToken ? { refresh_token: storedRefreshToken } : {}),
+    });
+
+    if (!refreshRes.ok) {
+      setClientAccessToken(null);
+      setClientRefreshToken(null);
+      return null;
+    }
+
+    const refreshData = await refreshRes.json().catch(() => null);
+    const newAccessToken = refreshData?.data?.tokens?.access_token;
+    const newRefreshToken = refreshData?.data?.tokens?.refresh_token;
+
+    if (newAccessToken) {
+      setClientAccessToken(newAccessToken);
+      if (newRefreshToken) {
+        setClientRefreshToken(newRefreshToken);
+      }
+      return newAccessToken;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function apiFetch<T>(
@@ -54,6 +142,7 @@ export async function apiFetch<T>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...((options.headers as Record<string, string>) || {}),
   };
@@ -66,7 +155,7 @@ export async function apiFetch<T>(
     credentials: 'include', // Send and receive HttpOnly cookies
   });
 
-  // Handle 401: attempt automatic token refresh once and retry
+  // Handle 401: interceptor calls refresh endpoint for new access & refresh tokens, then retries
   if (
     response.status === 401 &&
     !_isRetry &&
@@ -75,34 +164,23 @@ export async function apiFetch<T>(
     !endpoint.includes('/auth/google')
   ) {
     try {
-      const refreshUrl = `${baseUrl}/auth/refresh`;
-      const refreshRes = await fetch(refreshUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        credentials: 'include',
-      });
+      if (!refreshPromise) {
+        refreshPromise = executeTokenRefresh().finally(() => {
+          refreshPromise = null;
+        });
+      }
 
-      if (refreshRes.ok) {
-        const refreshData = await refreshRes.json();
-        const newToken = refreshData?.data?.tokens?.access_token;
-        if (newToken) {
-          setClientAccessToken(newToken);
-          headers['Authorization'] = `Bearer ${newToken}`;
+      const newToken = await refreshPromise;
 
-          const retryRes = await fetch(url, {
-            ...fetchOptions,
-            headers,
-            credentials: 'include',
-          });
-
-          const retryData = await retryRes.json().catch(() => null);
-          if (retryRes.ok) {
-            return retryData?.data as T;
-          }
-        }
+      if (newToken) {
+        return apiFetch<T>(endpoint, {
+          ...options,
+          _isRetry: true,
+          headers: {
+            ...((options.headers as Record<string, string>) || {}),
+            Authorization: `Bearer ${newToken}`,
+          },
+        });
       }
     } catch {
       // Refresh failed, proceed to handle original error below

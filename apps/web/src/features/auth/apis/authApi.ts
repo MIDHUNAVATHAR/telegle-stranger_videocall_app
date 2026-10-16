@@ -45,7 +45,8 @@ export const authApi = {
 
   getMe: () => api.get<UserProfile>('/auth/me'),
 
-  refreshToken: () => api.post<RefreshResponse>('/auth/refresh'),
+  refreshToken: (refreshToken?: string) =>
+    api.post<RefreshResponse>('/auth/refresh', refreshToken ? { refresh_token: refreshToken } : {}),
 
   logout: () => api.post<{ message: string }>('/auth/logout'),
 };

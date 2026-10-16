@@ -17,32 +17,41 @@ export class AuthController {
     private readonly getCurrentUserUseCase: GetCurrentUserUseCase
   ) {}
 
-  private setAuthCookies(res: Response, tokens: AuthTokens): void {
-    const isProd = env.NODE_ENV === 'production';
+  private setAuthCookies(res: Response, req: Request, tokens: AuthTokens): void {
+    const origin = (req.headers.origin as string) || (req.headers.referer as string) || '';
+    const isHttpsOrigin = origin.startsWith('https://');
+    const isHttpsReq = req.secure || req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https';
+    const isSecure = isHttpsReq || isHttpsOrigin || env.NODE_ENV === 'production';
 
     res.cookie('dp_access_token', tokens.accessToken, {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
+      partitioned: isSecure,
       path: '/',
       maxAge: 15 * 60 * 1000, // 15 mins
     });
 
     res.cookie('dp_refresh_token', tokens.refreshToken, {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
+      partitioned: isSecure,
       path: '/',
       maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
     });
   }
 
-  private clearAuthCookies(res: Response): void {
-    const isProd = env.NODE_ENV === 'production';
-    const sameSite = isProd ? 'none' : 'lax';
-    res.clearCookie('dp_access_token', { path: '/', sameSite, secure: isProd });
-    res.clearCookie('dp_refresh_token', { path: '/', sameSite, secure: isProd });
-    res.clearCookie('dp_refresh_token', { path: '/api/v1/auth', sameSite, secure: isProd });
+  private clearAuthCookies(res: Response, req: Request): void {
+    const origin = (req.headers.origin as string) || (req.headers.referer as string) || '';
+    const isHttpsOrigin = origin.startsWith('https://');
+    const isHttpsReq = req.secure || req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https';
+    const isSecure = isHttpsReq || isHttpsOrigin || env.NODE_ENV === 'production';
+    const sameSite = isSecure ? 'none' : 'lax';
+
+    res.clearCookie('dp_access_token', { path: '/', sameSite, secure: isSecure, partitioned: isSecure });
+    res.clearCookie('dp_refresh_token', { path: '/', sameSite, secure: isSecure, partitioned: isSecure });
+    res.clearCookie('dp_refresh_token', { path: '/api/v1/auth', sameSite, secure: isSecure, partitioned: isSecure });
   }
 
   private formatUser(user: User): Record<string, unknown> {
@@ -88,7 +97,7 @@ export class AuthController {
         referralCode: req.body.referral_code || req.body.referralCode,
       });
 
-      this.setAuthCookies(res, result.tokens);
+      this.setAuthCookies(res, req, result.tokens);
 
       res.status(200).json({
         success: true,
@@ -113,7 +122,7 @@ export class AuthController {
         referralCode: req.body.referral_code || req.body.referralCode,
       });
 
-      this.setAuthCookies(res, result.tokens);
+      this.setAuthCookies(res, req, result.tokens);
 
       res.status(200).json({
         success: true,
@@ -138,7 +147,7 @@ export class AuthController {
         refreshToken: token,
       });
 
-      this.setAuthCookies(res, result.tokens);
+      this.setAuthCookies(res, req, result.tokens);
 
       res.status(200).json({
         success: true,
@@ -155,9 +164,9 @@ export class AuthController {
     }
   };
 
-  public logout = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      this.clearAuthCookies(res);
+      this.clearAuthCookies(res, req);
       res.status(200).json({
         success: true,
         data: {
