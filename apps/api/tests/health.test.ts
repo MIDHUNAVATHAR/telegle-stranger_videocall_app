@@ -7,7 +7,7 @@ describe('Phase 1 Foundation: Health, Liveness, Readiness & Swagger Endpoints', 
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('status', 'ok');
-    expect(res.body).toHaveProperty('service', 'donkey-play-api');
+    expect(res.body).toHaveProperty('service', 'telegle-api');
     expect(res.body).toHaveProperty('version');
     expect(res.body).toHaveProperty('uptime');
     expect(res.body).toHaveProperty('timestamp');

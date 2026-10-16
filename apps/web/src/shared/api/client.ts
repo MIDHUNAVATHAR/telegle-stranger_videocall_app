@@ -1,4 +1,9 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+export const getApiBaseUrl = (): string => {
+  const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+  return url.replace(/\/+$/, '');
+};
+
+export const BASE_URL = getApiBaseUrl();
 
 export class ApiError extends Error {
   constructor(
@@ -41,7 +46,9 @@ export async function apiFetch<T>(
   endpoint: string,
   options: ExtendedRequestInit = {}
 ): Promise<T> {
-  const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
+  const baseUrl = getApiBaseUrl();
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${cleanEndpoint}`;
   const token = getClientAccessToken();
 
   const headers: Record<string, string> = {
@@ -68,7 +75,7 @@ export async function apiFetch<T>(
     !endpoint.includes('/auth/google')
   ) {
     try {
-      const refreshUrl = `${BASE_URL}/auth/refresh`;
+      const refreshUrl = `${baseUrl}/auth/refresh`;
       const refreshRes = await fetch(refreshUrl, {
         method: 'POST',
         headers: {

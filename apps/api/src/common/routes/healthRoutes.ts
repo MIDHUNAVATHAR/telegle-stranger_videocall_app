@@ -9,7 +9,7 @@ export const createHealthRouter = (): Router => {
   const handleHealth = (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
-      service: 'donkey-play-api',
+      service: 'telegle-api',
       version: '0.1.0',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),

@@ -1,7 +1,12 @@
 import { io, Socket } from 'socket.io-client';
 import { getClientAccessToken } from '../../../shared/api/client';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
+const getSocketUrl = (): string => {
+  const url = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:5000';
+  return url.replace(/\/+$/, '');
+};
+
+const SOCKET_URL = getSocketUrl();
 
 class SocketService {
   private matchmakingSocket: Socket | null = null;
